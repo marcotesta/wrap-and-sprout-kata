@@ -37,33 +37,35 @@ The Sprout Method is a technique from Michael Feathers' *Working Effectively wit
 2. **Write a commented-out call to a new method that will do the work.** Sketch the call before it exists.
 
    ```ts
-   // const invalid = this.collectInvalidAccountHolders(employees);
+   // if (!this.isValidAccountNumber(employee.accountNumber)) { ... }
    ```
 
 3. **Determine which local variables it needs and make them parameters.** Pass in exactly what the sprout reads.
 
    ```ts
-   // collectInvalidAccountHolders(employees: Employee[]): ...
+   // isValidAccountNumber(accountNumber: string): ...
    ```
 
-4. **Determine whether it must return a value.** Here the names of skipped employees must flow back out.
+4. **Determine whether it must return a value.** Here it answers one question — is this account valid? — so it returns a `boolean`.
 
    ```ts
-   collectInvalidAccountHolders(employees: Employee[]): string[];
+   isValidAccountNumber(accountNumber: string): boolean;
    ```
 
 5. **Develop the sprout method test-first (TDD).** Write failing tests, then the smallest implementation that passes.
 
    ```ts
-   it('flags empty account numbers as invalid', () => {
-     // arrange employees, act, assert names are collected
+   it('rejects an empty account number', () => {
+     // arrange an account number, act, assert it is invalid
    });
    ```
 
-6. **Uncomment the call.** Wire the now-tested sprout into the legacy method.
+6. **Uncomment the call.** Wire the now-tested sprout into the legacy method, using it to skip invalid employees.
 
    ```ts
-   const invalid = this.collectInvalidAccountHolders(employees);
+   if (!this.isValidAccountNumber(employee.accountNumber)) {
+     continue; // skip payment for this employee
+   }
    ```
 
 ## The Kata
@@ -84,12 +86,14 @@ Because of these dependencies, you should not try to test `processPayroll` as a 
 
 ### Your Task
 
-Before sending any payment, validate the employee's bank account number: it must be non-empty, contain numeric characters only, and be between 6 and 34 digits long. Skip employees with an invalid account (do not send their payment) and collect their names into a `string[]`. Change `processPayroll`'s return type from `void` to `string[]` so it returns the names of the skipped employees. The validation must live in a sprouted function or method that is tested in isolation.
+Before sending any payment, validate the employee's bank account number: it must be non-empty, contain numeric characters only, and be between 6 and 34 digits long. Skip employees with an invalid account (do not send their payment). The validation must live in a sprouted function or method that is tested in isolation.
+
+> **Why the signature stays the same.** Sprout Method deliberately leaves the host method untested; only the sprout is covered. Changing `processPayroll`'s return type would push a new, observable behavior into that untestable method — something you could neither verify with a test nor justify as a minimal edit to fragile legacy code. So keep `processPayroll` returning `void`: the sprout answers a question, and the host *consumes* that answer internally to decide whether to skip. (If you also want the skipped names surfaced, do it through the existing `console.log` summary line — still untested wiring, by design.)
 
 ### Acceptance Criteria
 
 - A new sprouted function/method performs the account-number validation and is covered by its own unit tests.
-- `processPayroll` returns a `string[]` containing the names of employees whose account number is invalid.
+- `processPayroll` keeps its `void` signature; the sprout's result is consumed inside the loop.
 - Employees with invalid account numbers are skipped and never passed to the payment gateway.
 - Employees with valid account numbers are processed exactly as before.
 - The build stays green: `npm test` and `npm run typecheck` both pass.

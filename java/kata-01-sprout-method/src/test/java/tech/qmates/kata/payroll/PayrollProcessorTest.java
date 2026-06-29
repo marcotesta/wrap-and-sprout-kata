@@ -7,7 +7,7 @@ class PayrollProcessorTest {
     // TODO: Write tests for your sprouted method here.
     // Example:
     // @Test
-    // void shouldCollectInvalidAccounts_whenAccountNumberIsEmpty() {
+    // void shouldRejectAccountNumber_whenEmpty() {
     //     ...
     // }
 }

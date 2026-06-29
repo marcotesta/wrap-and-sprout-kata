@@ -38,22 +38,22 @@ Sprout Method, from Michael Feathers' *Working Effectively with Legacy Code* (Ch
 2. **Write a commented-out call to a new method that will do the work.**
 
    ```java
-   // List<String> invalid = collectInvalidAccounts(employees);
+   // if (!isValidAccountNumber(employee.getAccountNumber())) { ... }
    ```
 
 3. **Determine which local variables the new method needs and make them parameters.**
-   The validation needs the list of employees, so it becomes a parameter.
+   The validation only needs the account number, so that becomes the single parameter.
 
    ```java
-   // List<String> collectInvalidAccounts(List<Employee> employees) { ... }
+   // boolean isValidAccountNumber(String accountNumber) { ... }
    ```
 
 4. **Determine whether the new method must return a value.**
-   Here the method must return the names of skipped employees, so it returns a `List<String>`.
+   Here it answers a single question — is this account number valid? — so it returns a `boolean`.
 
    ```java
-   List<String> collectInvalidAccounts(List<Employee> employees) {
-       // returns names with invalid account numbers
+   boolean isValidAccountNumber(String accountNumber) {
+       // true when the format rule is satisfied
    }
    ```
 
@@ -62,16 +62,18 @@ Sprout Method, from Michael Feathers' *Working Effectively with Legacy Code* (Ch
 
    ```java
    @Test
-   void shouldCollectName_whenAccountNumberIsEmpty() {
-       // arrange, act, assert against collectInvalidAccounts(...)
+   void shouldRejectAccountNumber_whenEmpty() {
+       // arrange, act, assert against isValidAccountNumber(...)
    }
    ```
 
 6. **Uncomment the call.**
-   Wire the now-tested sprout into the legacy method.
+   Wire the now-tested sprout into the legacy loop, using it to skip invalid employees.
 
    ```java
-   List<String> invalid = collectInvalidAccounts(employees);
+   if (!isValidAccountNumber(employee.getAccountNumber())) {
+       continue; // skip payment for this employee
+   }
    ```
 
 ## The Kata
@@ -86,14 +88,16 @@ A company runs a small payroll system. Every pay cycle, a `PayrollProcessor` tak
 
 ### Your Task
 
-Before sending any payment, validate that the employee's bank account number matches a simple format rule: non-empty, numeric characters only, and between 6 and 34 digits in length. Employees with invalid account numbers must be **skipped** (no payment sent), and their names must be collected into a `List<String>` that is **returned** by the method. Change the return type of `processPayroll` from `void` to `List<String>`. Implement the validation as a **sprouted, independently-testable method** — develop it test-first and only then wire it into the legacy loop.
+Before sending any payment, validate that the employee's bank account number matches a simple format rule: non-empty, numeric characters only, and between 6 and 34 digits in length. Employees with invalid account numbers must be **skipped** — no payment is sent for them. Implement the validation as a **sprouted, independently-testable method** — develop it test-first and only then wire it into the legacy loop.
+
+> **Why the signature stays the same.** Sprout Method deliberately leaves the host method untested; only the sprout is covered. Changing `processPayroll`'s return type would push a new, observable behaviour into that untestable method — something you could neither verify with a test nor justify as a minimal edit to fragile legacy code. So keep `processPayroll` returning `void`: the sprout answers a question, and the host *consumes* that answer internally to decide whether to skip. (If you also want the skipped names surfaced, do it through the existing `System.out` summary line — still untested wiring, by design.)
 
 ### Acceptance Criteria
 
 - Validation is extracted into a new, separate method that can be tested without touching `PaymentGateway` or the network.
 - The sprout method is covered by unit tests written test-first.
 - Employees with invalid account numbers are skipped and never passed to the gateway.
-- `processPayroll` returns the list of names of skipped employees.
+- `processPayroll` keeps its `void` signature; the sprout's result is consumed inside the loop.
 - The original tax/payment logic for valid employees remains unchanged.
 
 ### Hints
