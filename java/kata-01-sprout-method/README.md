@@ -90,8 +90,6 @@ A company runs a small payroll system. Every pay cycle, a `PayrollProcessor` tak
 
 Before sending any payment, validate that the employee's bank account number matches a simple format rule: non-empty, numeric characters only, and between 6 and 34 digits in length. Employees with invalid account numbers must be **skipped** — no payment is sent for them. Implement the validation as a **sprouted, independently-testable method** — develop it test-first and only then wire it into the legacy loop.
 
-> **Why the signature stays the same.** Sprout Method deliberately leaves the host method untested; only the sprout is covered. Changing `processPayroll`'s return type would push a new, observable behaviour into that untestable method — something you could neither verify with a test nor justify as a minimal edit to fragile legacy code. So keep `processPayroll` returning `void`: the sprout answers a question, and the host *consumes* that answer internally to decide whether to skip. (If you also want the skipped names surfaced, do it through the existing `System.out` summary line — still untested wiring, by design.)
-
 ### Acceptance Criteria
 
 - Validation is extracted into a new, separate method that can be tested without touching `PaymentGateway` or the network.
