@@ -6,21 +6,15 @@ package tech.qmates.kata.hr;
 public class PromotionEvent {
 
     private final String employeeId;
-    private final String previousTitle;
     private final String newTitle;
 
-    public PromotionEvent(String employeeId, String previousTitle, String newTitle) {
+    public PromotionEvent(String employeeId, String newTitle) {
         this.employeeId = employeeId;
-        this.previousTitle = previousTitle;
         this.newTitle = newTitle;
     }
 
     public String getEmployeeId() {
         return employeeId;
-    }
-
-    public String getPreviousTitle() {
-        return previousTitle;
     }
 
     public String getNewTitle() {
@@ -29,7 +23,6 @@ public class PromotionEvent {
 
     @Override
     public String toString() {
-        return "PromotionEvent{employeeId='" + employeeId + "', previousTitle='"
-                + previousTitle + "', newTitle='" + newTitle + "'}";
+        return "PromotionEvent{employeeId='" + employeeId + "', newTitle='" + newTitle + "'}";
     }
 }

@@ -64,7 +64,6 @@ Make every **successful** promotion publish a `PromotionEvent` to the `EventBus`
 - Order matters: call `executePromotion(...)` *first*; publish only on the line after it returns. Because a thrown `PromotionError` skips the rest of the method, placing the publish last gives you "no event on failure" for free — no try/catch needed.
 - Make the new method testable by design: accept an `EventBus` parameter instead of constructing one inside it. The wrapper injects a `RealEventBus`; a test injects an `ObservableEventBus` and reads back its `publishedEvents()`.
 - Test the new method on a plain `new EmployeeService()`. You do **not** need to call `promote`, mock the repository, or subclass anything.
-- The wrapper only sees the method's inputs, not the stored record, so it cannot know the employee's *previous* title — that is why the event's `fromTitle` is left `null`.
 
 ## Steps to Apply the Technique
 
@@ -111,7 +110,6 @@ Make every **successful** promotion publish a `PromotionEvent` to the `EventBus`
      eventBus.publish({
        type: 'employee.promoted',
        employeeId,
-       fromTitle: null, // the wrapper cannot know the previous title
        toTitle: newTitle,
        occurredAt: new Date(),
      });

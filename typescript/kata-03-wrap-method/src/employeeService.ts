@@ -23,7 +23,6 @@ export type EmployeeRecord = {
 export type PromotionEvent = {
   type: 'employee.promoted';
   employeeId: string;
-  fromTitle: string | null;
   toTitle: string;
   occurredAt: Date;
 };

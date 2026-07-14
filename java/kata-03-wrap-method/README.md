@@ -57,7 +57,6 @@ Every **successful** promotion must now publish a `PromotionEvent` to the `Event
 - Order matters: call `executePromotion(...)` *first*; publish only on the line after it returns. Because a thrown `PromotionException` skips the rest of the method, placing the publish last gives you "no event on failure" for free — no try/catch needed.
 - Make the new method testable by design: accept an `EventBus` parameter instead of constructing one inside it. The wrapper injects a `RealEventBus`; a test injects an `ObservableEventBus` and reads back its `publishedEvents()`.
 - Keep the new method package-private so the same-package test can call it directly. You do **not** need to call `promote`, mock the repository, or subclass anything — just test the method on a plain `new EmployeeService()`.
-- The wrapper only sees the method's inputs, not the stored record, so it cannot know the employee's *previous* title — that is why the event's `previousTitle` is left `null`.
 
 ## Steps to Apply the Technique
 
@@ -96,7 +95,7 @@ Every **successful** promotion must now publish a `PromotionEvent` to the `Event
    }
 
    void publishPromotionEvent(EventBus eventBus, String employeeId, String newTitle) {
-       eventBus.publish(new PromotionEvent(employeeId, /* previousTitle */ null, newTitle));
+       eventBus.publish(new PromotionEvent(employeeId, newTitle));
    }
    ```
 
