@@ -23,7 +23,7 @@ export type EmployeeRecord = {
 export type PromotionEvent = {
   type: 'employee.promoted';
   employeeId: string;
-  fromTitle: string;
+  fromTitle: string | null;
   toTitle: string;
   occurredAt: Date;
 };
@@ -36,11 +36,30 @@ export class PromotionError extends Error {
   }
 }
 
-// An event bus that can be created directly with `new EventBus()`.
-export class EventBus {
-  publish(event: PromotionEvent): void {
-    // In production this would push to a message broker / outbox.
-    console.log(`[EventBus] published ${event.type} for ${event.employeeId}`);
+// Publishes domain events. Two implementations exist: RealEventBus (production —
+// its `publish` performs a genuine side effect) and, under `tests/`, an
+// ObservableEventBus that merely records what was published so tests can assert
+// on it — no database, no mocking framework.
+//
+// Inject a RealEventBus in the wrapper and an ObservableEventBus in the tests of
+// your new publishing method.
+export interface EventBus {
+  publish(event: unknown): void;
+}
+
+// Production EventBus. In a real system `publish` would push to a message broker
+// / outbox — a genuine, irreversible side effect.
+//
+// Here it deliberately throws: if this runs inside a test, you accidentally
+// triggered a real publication. Inject an ObservableEventBus in tests instead,
+// and keep this one for the wrapper's production wiring.
+export class RealEventBus implements EventBus {
+  publish(event: unknown): void {
+    throw new Error(
+      'RealEventBus.publish performed a REAL publication (message broker / subscribers). ' +
+        'This must never run in a test — inject an ObservableEventBus and assert on ' +
+        'its publishedEvents() instead.',
+    );
   }
 }
 

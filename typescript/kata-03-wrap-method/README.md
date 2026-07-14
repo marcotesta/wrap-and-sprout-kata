@@ -40,27 +40,31 @@ You should not refactor the repository for this kata. Instead, add the new event
 
 ### Your Task
 
-Make every **successful** promotion publish a `PromotionEvent` to an `EventBus` created with `new EventBus()`, using **Wrap Method**:
+Make every **successful** promotion publish a `PromotionEvent` to the `EventBus`. `EventBus` is an interface with two implementations: `RealEventBus` (production — its `publish` performs a genuine side effect) and, under `tests/`, `ObservableEventBus` (test-only — it records what was published). Apply **Wrap Method**:
 
 1. Rename the existing `promote` to a private `executePromotion` (keep its body unchanged).
-2. Add a new public `promote(employeeId: string, newTitle: string): void` wrapper with the identical signature.
-3. The wrapper calls `executePromotion` first, then publishes the `PromotionEvent`.
+2. Add a new public `promote(employeeId: string, newTitle: string): void` wrapper with the identical signature that calls `executePromotion` and then publishes the event.
+3. Put the publishing in its own small method that takes an `EventBus` parameter, so you can develop it **test-first**. In the wrapper, inject a `new RealEventBus()`; in the tests, inject a `new ObservableEventBus()`.
 
-**Added complexity:** if `executePromotion` throws a `PromotionError` (a rule fails) the event must **not** be published. Order the wrapper's calls so that `publish` runs only after the wrapped call succeeds — let the error propagate before reaching the publish step.
+**Added complexity (ordering):** if `executePromotion` throws a `PromotionError` (a rule fails) the event must **not** be published. Put the publish call *after* the wrapped call and let the error propagate: a promotion that fails never reaches the publish line. This is a property of how you order the wrapper, not something you unit-test through the database.
+
+**How to test it (test-first):** do **not** call `promote` in your tests — that runs the legacy code and opens the production database. The new publishing method is self-contained: create an `ObservableEventBus`, pass it in, call the method directly, and assert on its `publishedEvents()`. Constructing `EmployeeService` is cheap (only `promote`/`executePromotion` touch the DB), so you can `new EmployeeService()` in a test and exercise the new method with no database, mocks, or subclassing.
 
 ### Acceptance Criteria
 
 - The public signature `promote(employeeId: string, newTitle: string): void` is unchanged; existing callers compile without edits.
-- A `PromotionEvent` is published exactly once after a successful promotion.
-- No event is published when `executePromotion` throws a `PromotionError`.
-- The original promotion logic still lives in `executePromotion` and is not modified.
+- The original promotion logic is preserved verbatim inside a private `executePromotion(...)` method.
+- The new publishing behaviour lives in its own method that takes an `EventBus` parameter; the wrapper injects a `RealEventBus`, and the tests inject an `ObservableEventBus`.
+- The new method is covered by tests written before its implementation (TDD), with **no database access** — the tests never call `promote` and never trigger `EmployeeRepository.getInstance()`.
+- In the wrapper the publish call sits *after* `executePromotion(...)`, so a successful promotion publishes exactly one `PromotionEvent` and a failing one publishes none.
 - `npm run typecheck` and `npm test` both pass.
 
 ### Hints
 
-- Put the `this.executePromotion(...)` call before `this.eventBus.publish(...)`; a thrown error short-circuits the wrapper before publish runs.
-- You do not need a real database to test the wrapper — drive the test through a `promote` call that fails validation early to assert the "no publish" path, and inject/observe the `EventBus` to assert publishing.
-- Keep the wrapper tiny: delegate, then publish. All the gnarly rules stay in `executePromotion`.
+- Order matters: call `executePromotion(...)` *first*; publish only on the line after it returns. Because a thrown `PromotionError` skips the rest of the method, placing the publish last gives you "no event on failure" for free — no try/catch needed.
+- Make the new method testable by design: accept an `EventBus` parameter instead of constructing one inside it. The wrapper injects a `RealEventBus`; a test injects an `ObservableEventBus` and reads back its `publishedEvents()`.
+- Test the new method on a plain `new EmployeeService()`. You do **not** need to call `promote`, mock the repository, or subclass anything.
+- The wrapper only sees the method's inputs, not the stored record, so it cannot know the employee's *previous* title — that is why the event's `fromTitle` is left `null`.
 
 ## Steps to Apply the Technique
 
@@ -95,13 +99,36 @@ Make every **successful** promotion publish a `PromotionEvent` to an `EventBus` 
    }
    ```
 
-4. **Develop the new behaviour test-first and call it from the new method.** Write the test for the new concern, then add the minimal code to the wrapper.
+4. **Develop the new behaviour test-first and call it from the new method.** Add a small, well-named method for the new behaviour and invoke it from the wrapper. Make it testable by passing in what it needs — here, the `EventBus` — instead of constructing collaborators inside it. In the wrapper, inject the production `RealEventBus`. Drive it with tests *before* wiring it in.
 
    ```ts
    promote(employeeId: string, newTitle: string): void {
      this.executePromotion(employeeId, newTitle);
-     this.eventBus.publish(/* PromotionEvent */);
+     this.publishPromotionEvent(new RealEventBus(), employeeId, newTitle);
+   }
+
+   publishPromotionEvent(eventBus: EventBus, employeeId: string, newTitle: string): void {
+     eventBus.publish({
+       type: 'employee.promoted',
+       employeeId,
+       fromTitle: null, // the wrapper cannot know the previous title
+       toTitle: newTitle,
+       occurredAt: new Date(),
+     });
    }
    ```
 
    Keep the signature of `promote` identical at every step so no caller has to change.
+
+5. **Test the new method in isolation (test-first).** Never call `promote` in a test — it would run `executePromotion` and hit the database. The new method is self-contained: hand it an `ObservableEventBus`, call it directly, and assert on what it published.
+
+   ```ts
+   import { ObservableEventBus } from './observableEventBus';
+
+   it('publishes a PromotionEvent', () => {
+     const bus = new ObservableEventBus();
+     new EmployeeService().publishPromotionEvent(bus, 'E-1', 'Senior Engineer');
+     // assert bus.publishedEvents() holds exactly one PromotionEvent
+     // for 'E-1' with toTitle 'Senior Engineer'
+   });
+   ```
