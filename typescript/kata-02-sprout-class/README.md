@@ -92,7 +92,7 @@ A quarterly reporting system produces an HTML financial report for each departme
 
 `QuarterlyReportGenerator` in `src/quarterlyReportGenerator.ts` is hard to test. Its constructor directly `new`s a real `DatabaseConnection` (which opens a live connection) and reads configuration from `process.env` — including the report language from `REPORTING_LANGUAGE`. There is no seam to inject a fake, so instantiating it in a unit test would hit the real database. Its `generate()` method queries the connection and builds the table rows, but currently emits **no header row**.
 
-The report is already localised, but in the worst possible way: the title, heading, and footer messages are translated by **hardcoded, inline logic inside `generate()`** (anything that is not Italian falls back to English). That inline translation is untestable from here for the very same reason — you cannot instantiate the class. This is the wart you must *not* copy when you add the header: instead of piling more inline localisation into the legacy method, you grow the header's localisation as a clean, independently tested sprout class.
+The report is already localised through tidy private helpers — but tidy is not the same as tested. They hang off a class you cannot instantiate, so no test can reach them. Add the header differently: grow its localisation as a clean, independently tested sprout class.
 
 ### Your Task
 
