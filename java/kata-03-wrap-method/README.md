@@ -34,27 +34,30 @@ You are working on the HR system of a mid-sized company. `EmployeeService` handl
 
 ### Your Task
 
-Every **successful** promotion must now publish a `PromotionEvent` to an `EventBus` (constructed with `new EventBus()`). Apply **Wrap Method**:
+Every **successful** promotion must now publish a `PromotionEvent` to the `EventBus`. `EventBus` is an interface with two implementations: `RealEventBus` (production — its `publish` performs a genuine side effect) and, under `src/test`, `ObservableEventBus` (test-only — it records what was published). Apply **Wrap Method**:
 
 1. Rename the existing `promote(String, String)` to a `private executePromotion(String, String)` (leave its body unchanged).
-2. Create a new public `promote(String, String)` with the identical signature that wraps `executePromotion`.
-3. Publish the `PromotionEvent` from the wrapper.
+2. Create a new public `promote(String, String)` with the identical signature that calls `executePromotion` and then publishes the event.
+3. Put the publishing in its own small method that takes an `EventBus` parameter, so you can develop it **test-first**. In the wrapper, inject a `new RealEventBus()`; in the tests, inject a `new ObservableEventBus()`.
 
-**Added complexity:** if `executePromotion` throws a `PromotionException`, the event must **NOT** be published. You therefore have to order the wrapper's calls so the publish happens only after the wrapped call returns successfully.
+**Added complexity (ordering):** if `executePromotion` throws a `PromotionException`, the event must **NOT** be published. Put the publish call *after* the wrapped call and let the exception propagate: a promotion that fails never reaches the publish line. This is a property of how you order the wrapper, not something you unit-test through the database.
+
+**How to test it (test-first):** do **not** call `promote` in your tests — that runs the legacy code and opens the production database. The new publishing method is self-contained: create an `ObservableEventBus`, pass it in, call the method directly, and assert on its `publishedEvents()`. Constructing `EmployeeService` is cheap (only `promote`/`executePromotion` touch the DB), so you can `new EmployeeService()` in a test and exercise the new method with no database, mocks, or subclassing.
 
 ### Acceptance Criteria
 
 - The public `promote(String, String)` keeps its exact original name, parameters, and `throws PromotionException` clause; no caller needs to change.
 - The original promotion logic is preserved verbatim inside a `private executePromotion(...)` method.
-- A `PromotionEvent` is published to an `EventBus` after every successful promotion.
-- When `executePromotion` throws `PromotionException`, no `PromotionEvent` is published and the exception propagates unchanged.
-- The new event-publishing behaviour is covered by tests written test-first.
+- The new publishing behaviour lives in its own method (public or package-private) that takes an `EventBus` parameter; the wrapper injects a `RealEventBus`, and the tests inject an `ObservableEventBus`.
+- The new method is covered by tests written before its implementation (TDD), with **no database access** — the tests never call `promote` and never trigger `EmployeeRepository.getInstance()`.
+- In the wrapper the publish call sits *after* `executePromotion(...)`, so a successful promotion publishes exactly one `PromotionEvent` and a failing one publishes none.
 
 ### Hints
 
-- Order matters: call `executePromotion(...)` *first*; only publish the event on the line after it returns — never wrap the publish in a way that runs before the rules are checked or when they fail.
-- Avoid catch-and-rethrow if you can: simply letting the exception escape before reaching the publish call gives you the "no event on failure" guarantee for free.
-- To make the new behaviour testable without touching the database singleton, introduce a seam around event publishing (e.g. a `publishPromotionEvent(...)` method or an overridable `EventBus` factory) so a test can observe what was published.
+- Order matters: call `executePromotion(...)` *first*; publish only on the line after it returns. Because a thrown `PromotionException` skips the rest of the method, placing the publish last gives you "no event on failure" for free — no try/catch needed.
+- Make the new method testable by design: accept an `EventBus` parameter instead of constructing one inside it. The wrapper injects a `RealEventBus`; a test injects an `ObservableEventBus` and reads back its `publishedEvents()`.
+- Keep the new method package-private so the same-package test can call it directly. You do **not** need to call `promote`, mock the repository, or subclass anything — just test the method on a plain `new EmployeeService()`.
+- The wrapper only sees the method's inputs, not the stored record, so it cannot know the employee's *previous* title — that is why the event's `previousTitle` is left `null`.
 
 ## Steps to Apply the Technique
 
@@ -85,16 +88,28 @@ Every **successful** promotion must now publish a `PromotionEvent` to an `EventB
    ```
 
 4. **Develop the new behaviour test-first and call it from the new method.**
-   Add a small, well-named method for the new behaviour and invoke it from the wrapper. Drive it with tests *before* wiring it in.
+   Add a small, well-named method for the new behaviour and invoke it from the wrapper. Make it testable by passing in what it needs — here, the `EventBus` — instead of constructing collaborators inside it. In the wrapper, inject the production `RealEventBus`. Drive it with tests *before* wiring it in.
    ```java
    public void promote(String employeeId, String newTitle) throws PromotionException {
        executePromotion(employeeId, newTitle);
-       publishPromotionEvent(employeeId, newTitle);
+       publishPromotionEvent(new RealEventBus(), employeeId, newTitle);
    }
 
-   private void publishPromotionEvent(String employeeId, String newTitle) {
-       new EventBus().publish(new PromotionEvent(employeeId, /* previousTitle */ null, newTitle));
+   void publishPromotionEvent(EventBus eventBus, String employeeId, String newTitle) {
+       eventBus.publish(new PromotionEvent(employeeId, /* previousTitle */ null, newTitle));
    }
    ```
 
    **Preserve the original signature.** The public `promote(String, String)` must keep the same name, parameters, return type, and `throws` clause so every existing caller compiles and behaves as before.
+
+5. **Test the new method in isolation (test-first).**
+   Never call `promote` in a test — it would run `executePromotion` and hit the database. The new method is self-contained: hand it an `ObservableEventBus`, call it directly, and assert on what it published.
+   ```java
+   @Test
+   void publishesPromotionEvent() {
+       ObservableEventBus bus = new ObservableEventBus();
+       new EmployeeService().publishPromotionEvent(bus, "E-1", "Senior Engineer");
+       // assert bus.publishedEvents() holds exactly one PromotionEvent
+       // whose employeeId is "E-1" and newTitle is "Senior Engineer"
+   }
+   ```

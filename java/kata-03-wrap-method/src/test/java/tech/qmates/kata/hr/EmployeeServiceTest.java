@@ -7,22 +7,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 /**
- * Skeleton test class. There are intentionally no @Test methods yet — that is
- * your job in this kata.
+ * Skeleton test class — no @Test methods yet; that is your job.
  *
- * TODO: Once you have applied Wrap Method, drive the new wrapped behaviour
- *       test-first. Verify that {@code publishPromotionEvent} is invoked on a
- *       successful promotion, and — critically — that NO PromotionEvent is
- *       published when the wrapped executePromotion throws a PromotionException.
+ * TODO: Drive the NEW publishing method test-first, in isolation. Don't call
+ *       promote(...) (it hits the database) — test the new method directly:
+ *       inject an ObservableEventBus and assert on bus.publishedEvents().
+ *       `new EmployeeService()` is cheap, so no mocks or subclassing needed.
  *
- * Example shape (commented out on purpose):
- *
- * @Test
- * void publishesPromotionEventOnSuccess() {
- *     // arrange: a seam that lets you observe EventBus.publish(...)
- *     // act:     service.promote("E-1", "Senior Engineer");
- *     // assert:  exactly one PromotionEvent was published
- * }
+ * // @Test
+ * // void publishesPromotionEvent() {
+ * //     ObservableEventBus bus = new ObservableEventBus();
+ * //     new EmployeeService().publishPromotionEvent(bus, "E-1", "Senior Engineer");
+ * //     // assert bus.publishedEvents() holds one PromotionEvent for "E-1" / "Senior Engineer"
+ * // }
  */
 class EmployeeServiceTest {
 }

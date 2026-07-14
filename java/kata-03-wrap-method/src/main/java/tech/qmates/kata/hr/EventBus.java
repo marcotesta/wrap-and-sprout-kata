@@ -1,14 +1,15 @@
 package tech.qmates.kata.hr;
 
 /**
- * A lightweight, directly instantiatable event bus. Unlike the repository it is
- * trivial to construct with {@code new EventBus()}, which makes it a friendly
- * collaborator for new, test-driven behaviour.
+ * Publishes domain events. There are two implementations: {@link RealEventBus}
+ * for production (its {@code publish} performs a genuine side effect) and, under
+ * {@code src/test}, an {@code ObservableEventBus} that merely records what was
+ * published so tests can assert on it — no database, no mocking framework.
+ *
+ * <p>Inject a {@link RealEventBus} in the wrapper and an {@code ObservableEventBus}
+ * in the tests of your new publishing method.
  */
-public class EventBus {
+public interface EventBus {
 
-    public void publish(Object event) {
-        // In a real system this would fan out to subscribers / a message broker.
-        System.out.println("[EventBus] published: " + event);
-    }
+    void publish(Object event);
 }
