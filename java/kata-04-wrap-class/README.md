@@ -22,6 +22,36 @@ In *Working Effectively with Legacy Code* (Ch. 6), Michael Feathers describes **
 - The class has a huge surface area, making full delegation tedious and error-prone (consider Extract Class or Sprout instead).
 - You actually need to change existing behaviour rather than add around it — that is a refactor of the original, not a wrap.
 
+## The Kata
+
+### Background
+
+We run an e-commerce platform. The `OrderProcessor` is the heart of order management: it validates an order, prices it, applies discounts and tax, persists it, reserves inventory and sends a confirmation e-mail. It works in production and we do not want to risk breaking it.
+
+### Legacy Code Description
+
+`OrderProcessor` is hard to test in isolation because it `new`-s **three** external collaborators inside its own constructor — `OrderRepository` (JDBC), `EmailService` (SMTP) and `InventoryService` (HTTP). Every one of them performs real I/O, so simply running `placeOrder` in a test would try to hit a database, a mail server and a warehouse API. There is no seam to swap them out. Worse, `OrderProcessor` implements **no interface**, so you cannot even substitute the whole processor with a test double. Properly breaking those collaborator dependencies (parameterising the constructor, introducing factories, etc.) would realistically take a full day and touch a lot of risky code.
+
+### Your Task
+
+Every call to `placeOrder(Order order)` must be **timed**. If it takes longer than **2000ms**, log a warning via `Logger` (created with `new Logger()` and its `warn(String)` method). This timing/logging must **not** be mixed into `OrderProcessor`.
+
+Apply **Wrap Class**: build a `TimingOrderProcessor` that holds an order processor and decorates `placeOrder`. Because `OrderProcessor` implements no interface, your **first** step is to **Extract an Interface** (e.g. `IOrderProcessor`) from `OrderProcessor` so that both the original and your wrapper implement the same contract — without this, the wrapper has nothing to delegate to and nothing to substitute in tests.
+
+### Acceptance Criteria
+
+- An interface (e.g. `IOrderProcessor`) is extracted, and `OrderProcessor` is changed only to add `implements IOrderProcessor` (no logic changes).
+- `TimingOrderProcessor implements IOrderProcessor`, takes an `IOrderProcessor` via its constructor, and delegates every method to it.
+- `placeOrder` is timed and a single warning is logged via `Logger.warn` only when it exceeds 2000ms; nothing is logged when it is fast.
+- The timing/logging logic lives entirely in the wrapper — `OrderProcessor` contains no timing or `Logger` code.
+- The behaviour is proven by tests written test-first, driven against a fake `IOrderProcessor` and a capturing `Logger` (no real DB/SMTP/HTTP).
+
+### Hints
+
+- Extract the interface first; let your IDE generate it from `OrderProcessor`'s public methods, then add `implements IOrderProcessor`. The wrapper depends on the interface, never on the concrete class.
+- Make `Logger` injectable into the wrapper (or extract its threshold) so a test can capture warnings; keep the default `new Logger()` for production wiring.
+- Test the wrapper against a hand-written slow/fast fake `IOrderProcessor` so you never touch the real `OrderRepository`, `EmailService` or `InventoryService`.
+
 ## Steps to Apply the Technique
 
 1. **Identify the method/behaviour you need to add.** Be precise about *where* the new code runs (before, after, or around the target method).
@@ -81,33 +111,3 @@ In *Working Effectively with Legacy Code* (Ch. 6), Michael Feathers describes **
    IOrderProcessor processor = new TimingOrderProcessor(new OrderProcessor());
    processor.placeOrder(order); // now timed + logged
    ```
-
-## The Kata
-
-### Background
-
-We run an e-commerce platform. The `OrderProcessor` is the heart of order management: it validates an order, prices it, applies discounts and tax, persists it, reserves inventory and sends a confirmation e-mail. It works in production and we do not want to risk breaking it.
-
-### Legacy Code Description
-
-`OrderProcessor` is hard to test in isolation because it `new`-s **three** external collaborators inside its own constructor — `OrderRepository` (JDBC), `EmailService` (SMTP) and `InventoryService` (HTTP). Every one of them performs real I/O, so simply running `placeOrder` in a test would try to hit a database, a mail server and a warehouse API. There is no seam to swap them out. Worse, `OrderProcessor` implements **no interface**, so you cannot even substitute the whole processor with a test double. Properly breaking those collaborator dependencies (parameterising the constructor, introducing factories, etc.) would realistically take a full day and touch a lot of risky code.
-
-### Your Task
-
-Every call to `placeOrder(Order order)` must be **timed**. If it takes longer than **2000ms**, log a warning via `Logger` (created with `new Logger()` and its `warn(String)` method). This timing/logging must **not** be mixed into `OrderProcessor`.
-
-Apply **Wrap Class**: build a `TimingOrderProcessor` that holds an order processor and decorates `placeOrder`. Because `OrderProcessor` implements no interface, your **first** step is to **Extract an Interface** (e.g. `IOrderProcessor`) from `OrderProcessor` so that both the original and your wrapper implement the same contract — without this, the wrapper has nothing to delegate to and nothing to substitute in tests.
-
-### Acceptance Criteria
-
-- An interface (e.g. `IOrderProcessor`) is extracted, and `OrderProcessor` is changed only to add `implements IOrderProcessor` (no logic changes).
-- `TimingOrderProcessor implements IOrderProcessor`, takes an `IOrderProcessor` via its constructor, and delegates every method to it.
-- `placeOrder` is timed and a single warning is logged via `Logger.warn` only when it exceeds 2000ms; nothing is logged when it is fast.
-- The timing/logging logic lives entirely in the wrapper — `OrderProcessor` contains no timing or `Logger` code.
-- The behaviour is proven by tests written test-first, driven against a fake `IOrderProcessor` and a capturing `Logger` (no real DB/SMTP/HTTP).
-
-### Hints
-
-- Extract the interface first; let your IDE generate it from `OrderProcessor`'s public methods, then add `implements IOrderProcessor`. The wrapper depends on the interface, never on the concrete class.
-- Make `Logger` injectable into the wrapper (or extract its threshold) so a test can capture warnings; keep the default `new Logger()` for production wiring.
-- Test the wrapper against a hand-written slow/fast fake `IOrderProcessor` so you never touch the real `OrderRepository`, `EmailService` or `InventoryService`.

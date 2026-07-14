@@ -22,6 +22,36 @@ In *Working Effectively with Legacy Code* (Ch. 6), Michael Feathers describes **
 - You reach for a wrapper to avoid fixing a class that actually needs refactoring.
 - The wrapper needs to peek at the original's private internals — that's a sign the seam is in the wrong place.
 
+## The Kata
+
+### Background
+
+An e-commerce platform processes customer orders: it validates them, calculates totals, discounts and tax, persists them, reserves inventory and emails a confirmation. The heart of this flow is the `OrderProcessor` class.
+
+### Legacy Code Description
+
+`OrderProcessor` (in `src/orderProcessor.ts`) is a large class with eight public methods. It is hard to test because it `new`s up three external services inside itself — `new OrderRepository()`, `new EmailService()`, `new InventoryService()` — all of which look like real I/O. There is no seam to substitute them, and crucially the class **implements no interface**. Properly breaking those dependencies (extracting and injecting each service) would take the better part of a day, so for this kata you must leave `OrderProcessor` untouched.
+
+### Your Task
+
+Every call to `placeOrder(order)` must be **timed**; if it takes longer than **2000ms**, log a warning through `Logger` (`new Logger()`). The timing and logging logic must **not** be mixed into `OrderProcessor`. Apply the **Wrap Class** technique: build a `TimingOrderProcessor` that holds an `IOrderProcessor` and decorates `placeOrder`.
+
+Because `OrderProcessor` implements no interface, your **first** step is to **Extract an Interface** (`IOrderProcessor`) so that the original class and your wrapper share a contract: `class OrderProcessor implements IOrderProcessor` and `class TimingOrderProcessor implements IOrderProcessor`. Only the interface extraction may touch the original file; the behaviour of `OrderProcessor` stays the same.
+
+### Acceptance Criteria
+
+- An `IOrderProcessor` interface is extracted and implemented by `OrderProcessor` (its behaviour unchanged otherwise).
+- A `TimingOrderProcessor` implements `IOrderProcessor`, takes an `IOrderProcessor` in its constructor, and delegates every method.
+- `placeOrder` is timed; a warning is logged via `Logger` only when it exceeds 2000ms, and not when it is fast.
+- No timing or logging code lives inside `OrderProcessor`.
+- `npm run typecheck` and `npm test` both pass.
+
+### Hints
+
+- Start by extracting `IOrderProcessor` from `OrderProcessor` — without a shared interface the wrapper has nothing to delegate through.
+- Write the test first: inject a fake/slow `IOrderProcessor` and a spy `Logger` so you control timing without real I/O.
+- Keep `TimingOrderProcessor` thin — it should only measure and (conditionally) warn; all real work stays behind `this.inner`.
+
 ## Steps to Apply the Technique
 
 1. **Identify the behaviour to add.** Be precise about which method(s) the new concern wraps.
@@ -75,33 +105,3 @@ In *Working Effectively with Legacy Code* (Ch. 6), Michael Feathers describes **
    const processor: IOrderProcessor = new TimingOrderProcessor(new OrderProcessor());
    processor.placeOrder(order);
    ```
-
-## The Kata
-
-### Background
-
-An e-commerce platform processes customer orders: it validates them, calculates totals, discounts and tax, persists them, reserves inventory and emails a confirmation. The heart of this flow is the `OrderProcessor` class.
-
-### Legacy Code Description
-
-`OrderProcessor` (in `src/orderProcessor.ts`) is a large class with eight public methods. It is hard to test because it `new`s up three external services inside itself — `new OrderRepository()`, `new EmailService()`, `new InventoryService()` — all of which look like real I/O. There is no seam to substitute them, and crucially the class **implements no interface**. Properly breaking those dependencies (extracting and injecting each service) would take the better part of a day, so for this kata you must leave `OrderProcessor` untouched.
-
-### Your Task
-
-Every call to `placeOrder(order)` must be **timed**; if it takes longer than **2000ms**, log a warning through `Logger` (`new Logger()`). The timing and logging logic must **not** be mixed into `OrderProcessor`. Apply the **Wrap Class** technique: build a `TimingOrderProcessor` that holds an `IOrderProcessor` and decorates `placeOrder`.
-
-Because `OrderProcessor` implements no interface, your **first** step is to **Extract an Interface** (`IOrderProcessor`) so that the original class and your wrapper share a contract: `class OrderProcessor implements IOrderProcessor` and `class TimingOrderProcessor implements IOrderProcessor`. Only the interface extraction may touch the original file; the behaviour of `OrderProcessor` stays the same.
-
-### Acceptance Criteria
-
-- An `IOrderProcessor` interface is extracted and implemented by `OrderProcessor` (its behaviour unchanged otherwise).
-- A `TimingOrderProcessor` implements `IOrderProcessor`, takes an `IOrderProcessor` in its constructor, and delegates every method.
-- `placeOrder` is timed; a warning is logged via `Logger` only when it exceeds 2000ms, and not when it is fast.
-- No timing or logging code lives inside `OrderProcessor`.
-- `npm run typecheck` and `npm test` both pass.
-
-### Hints
-
-- Start by extracting `IOrderProcessor` from `OrderProcessor` — without a shared interface the wrapper has nothing to delegate through.
-- Write the test first: inject a fake/slow `IOrderProcessor` and a spy `Logger` so you control timing without real I/O.
-- Keep `TimingOrderProcessor` thin — it should only measure and (conditionally) warn; all real work stays behind `this.inner`.

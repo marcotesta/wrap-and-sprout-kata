@@ -22,6 +22,42 @@ The Sprout Method is a technique from Michael Feathers' *Working Effectively wit
 - The sprout would need so many parameters that the call site becomes unreadable.
 - The change is really a modification of existing behavior, not genuinely new behavior.
 
+## The Kata
+
+### Background
+
+A payroll system computes each employee's net pay from a hardcoded tax table and sends the payment to their bank account through a payments provider. It runs as a batch over a list of employees and prints a summary when it finishes.
+
+### Legacy Code Description
+
+`PayrollProcessor.processPayroll` is hard to test:
+
+- It creates `new PaymentGateway()` directly inside the loop, and that gateway makes a real network call via `fetch(...)` to the payments URL. Running the method in a test would fire live HTTP requests.
+- It writes a summary line with `console.log`, an untestable side effect on stdout.
+- The tax brackets are hardcoded inline, so there are no seams to substitute behavior.
+
+Because of these dependencies, you should not try to test `processPayroll` as a whole. Instead, grow the new behavior as a sprouted, independently testable method.
+
+### Your Task
+
+Before sending any payment, validate the employee's bank account number: it must be non-empty, contain numeric characters only, and be between 6 and 34 digits long. Skip employees with an invalid account (do not send their payment). The validation must live in a sprouted function or method that is tested in isolation.
+
+> **Why the signature stays the same.** Sprout Method deliberately leaves the host method untested; only the sprout is covered. Changing `processPayroll`'s return type would push a new, observable behavior into that untestable method — something you could neither verify with a test nor justify as a minimal edit to fragile legacy code. So keep `processPayroll` returning `void`: the sprout answers a question, and the host *consumes* that answer internally to decide whether to skip. (If you also want the skipped names surfaced, do it through the existing `console.log` summary line — still untested wiring, by design.)
+
+### Acceptance Criteria
+
+- A new sprouted function/method performs the account-number validation and is covered by its own unit tests.
+- `processPayroll` keeps its `void` signature; the sprout's result is consumed inside the loop.
+- Employees with invalid account numbers are skipped and never passed to the payment gateway.
+- Employees with valid account numbers are processed exactly as before.
+- The build stays green: `npm test` and `npm run typecheck` both pass.
+
+### Hints
+
+- Start with the skeleton in `tests/payrollProcessor.test.ts`: replace the `it.todo` with real, failing tests for the sprout, then make them pass.
+- Test the sprout directly — it should take plain inputs and return data, with no `PaymentGateway` or `console.log` involved.
+- A regular expression such as `/^\d{6,34}$/` captures "numeric only, 6 to 34 digits" in one check.
+
 ## Steps to Apply the Technique
 
 1. **Identify where in the method you need the change.** Find the single point where the new behavior belongs.
@@ -67,39 +103,3 @@ The Sprout Method is a technique from Michael Feathers' *Working Effectively wit
      continue; // skip payment for this employee
    }
    ```
-
-## The Kata
-
-### Background
-
-A payroll system computes each employee's net pay from a hardcoded tax table and sends the payment to their bank account through a payments provider. It runs as a batch over a list of employees and prints a summary when it finishes.
-
-### Legacy Code Description
-
-`PayrollProcessor.processPayroll` is hard to test:
-
-- It creates `new PaymentGateway()` directly inside the loop, and that gateway makes a real network call via `fetch(...)` to the payments URL. Running the method in a test would fire live HTTP requests.
-- It writes a summary line with `console.log`, an untestable side effect on stdout.
-- The tax brackets are hardcoded inline, so there are no seams to substitute behavior.
-
-Because of these dependencies, you should not try to test `processPayroll` as a whole. Instead, grow the new behavior as a sprouted, independently testable method.
-
-### Your Task
-
-Before sending any payment, validate the employee's bank account number: it must be non-empty, contain numeric characters only, and be between 6 and 34 digits long. Skip employees with an invalid account (do not send their payment). The validation must live in a sprouted function or method that is tested in isolation.
-
-> **Why the signature stays the same.** Sprout Method deliberately leaves the host method untested; only the sprout is covered. Changing `processPayroll`'s return type would push a new, observable behavior into that untestable method — something you could neither verify with a test nor justify as a minimal edit to fragile legacy code. So keep `processPayroll` returning `void`: the sprout answers a question, and the host *consumes* that answer internally to decide whether to skip. (If you also want the skipped names surfaced, do it through the existing `console.log` summary line — still untested wiring, by design.)
-
-### Acceptance Criteria
-
-- A new sprouted function/method performs the account-number validation and is covered by its own unit tests.
-- `processPayroll` keeps its `void` signature; the sprout's result is consumed inside the loop.
-- Employees with invalid account numbers are skipped and never passed to the payment gateway.
-- Employees with valid account numbers are processed exactly as before.
-- The build stays green: `npm test` and `npm run typecheck` both pass.
-
-### Hints
-
-- Start with the skeleton in `tests/payrollProcessor.test.ts`: replace the `it.todo` with real, failing tests for the sprout, then make them pass.
-- Test the sprout directly — it should take plain inputs and return data, with no `PaymentGateway` or `console.log` involved.
-- A regular expression such as `/^\d{6,34}$/` captures "numeric only, 6 to 34 digits" in one check.

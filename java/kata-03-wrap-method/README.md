@@ -22,6 +22,40 @@ Wrap Method is one of the techniques Michael Feathers describes in *Working Effe
 - The new behaviour must run conditionally based on internals of the old method (a wrapper only sees inputs/outputs/exceptions, not internal state).
 - Wrapping is being used to avoid understanding the legacy method rather than to manage genuine risk.
 
+## The Kata
+
+### Background
+
+You are working on the HR system of a mid-sized company. `EmployeeService` handles promotions, demotions and transfers. It is a long-lived class that many teams depend on.
+
+### Legacy Code Description
+
+`EmployeeService.promote(String, String)` is hard to test. It loads and saves employees through `EmployeeRepository.getInstance()` — a singleton whose constructor opens a real connection to the production HR database. There is no way to inject a fake: calling `promote` triggers a real DB round-trip. Mocking the singleton would be invasive (you would have to reach into static state). For this kata, **do not** add dependency injection for the repository. Treat the existing `promote` logic as legacy code you must not rewrite; your job is to add behaviour *around* it.
+
+### Your Task
+
+Every **successful** promotion must now publish a `PromotionEvent` to an `EventBus` (constructed with `new EventBus()`). Apply **Wrap Method**:
+
+1. Rename the existing `promote(String, String)` to a `private executePromotion(String, String)` (leave its body unchanged).
+2. Create a new public `promote(String, String)` with the identical signature that wraps `executePromotion`.
+3. Publish the `PromotionEvent` from the wrapper.
+
+**Added complexity:** if `executePromotion` throws a `PromotionException`, the event must **NOT** be published. You therefore have to order the wrapper's calls so the publish happens only after the wrapped call returns successfully.
+
+### Acceptance Criteria
+
+- The public `promote(String, String)` keeps its exact original name, parameters, and `throws PromotionException` clause; no caller needs to change.
+- The original promotion logic is preserved verbatim inside a `private executePromotion(...)` method.
+- A `PromotionEvent` is published to an `EventBus` after every successful promotion.
+- When `executePromotion` throws `PromotionException`, no `PromotionEvent` is published and the exception propagates unchanged.
+- The new event-publishing behaviour is covered by tests written test-first.
+
+### Hints
+
+- Order matters: call `executePromotion(...)` *first*; only publish the event on the line after it returns — never wrap the publish in a way that runs before the rules are checked or when they fail.
+- Avoid catch-and-rethrow if you can: simply letting the exception escape before reaching the publish call gives you the "no event on failure" guarantee for free.
+- To make the new behaviour testable without touching the database singleton, introduce a seam around event publishing (e.g. a `publishPromotionEvent(...)` method or an overridable `EventBus` factory) so a test can observe what was published.
+
 ## Steps to Apply the Technique
 
 1. **Identify the method you need to change.**
@@ -64,37 +98,3 @@ Wrap Method is one of the techniques Michael Feathers describes in *Working Effe
    ```
 
    **Preserve the original signature.** The public `promote(String, String)` must keep the same name, parameters, return type, and `throws` clause so every existing caller compiles and behaves as before.
-
-## The Kata
-
-### Background
-
-You are working on the HR system of a mid-sized company. `EmployeeService` handles promotions, demotions and transfers. It is a long-lived class that many teams depend on.
-
-### Legacy Code Description
-
-`EmployeeService.promote(String, String)` is hard to test. It loads and saves employees through `EmployeeRepository.getInstance()` — a singleton whose constructor opens a real connection to the production HR database. There is no way to inject a fake: calling `promote` triggers a real DB round-trip. Mocking the singleton would be invasive (you would have to reach into static state). For this kata, **do not** add dependency injection for the repository. Treat the existing `promote` logic as legacy code you must not rewrite; your job is to add behaviour *around* it.
-
-### Your Task
-
-Every **successful** promotion must now publish a `PromotionEvent` to an `EventBus` (constructed with `new EventBus()`). Apply **Wrap Method**:
-
-1. Rename the existing `promote(String, String)` to a `private executePromotion(String, String)` (leave its body unchanged).
-2. Create a new public `promote(String, String)` with the identical signature that wraps `executePromotion`.
-3. Publish the `PromotionEvent` from the wrapper.
-
-**Added complexity:** if `executePromotion` throws a `PromotionException`, the event must **NOT** be published. You therefore have to order the wrapper's calls so the publish happens only after the wrapped call returns successfully.
-
-### Acceptance Criteria
-
-- The public `promote(String, String)` keeps its exact original name, parameters, and `throws PromotionException` clause; no caller needs to change.
-- The original promotion logic is preserved verbatim inside a `private executePromotion(...)` method.
-- A `PromotionEvent` is published to an `EventBus` after every successful promotion.
-- When `executePromotion` throws `PromotionException`, no `PromotionEvent` is published and the exception propagates unchanged.
-- The new event-publishing behaviour is covered by tests written test-first.
-
-### Hints
-
-- Order matters: call `executePromotion(...)` *first*; only publish the event on the line after it returns — never wrap the publish in a way that runs before the rules are checked or when they fail.
-- Avoid catch-and-rethrow if you can: simply letting the exception escape before reaching the publish call gives you the "no event on failure" guarantee for free.
-- To make the new behaviour testable without touching the database singleton, introduce a seam around event publishing (e.g. a `publishPromotionEvent(...)` method or an overridable `EventBus` factory) so a test can observe what was published.

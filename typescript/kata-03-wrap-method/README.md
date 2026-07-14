@@ -22,6 +22,46 @@ In *Working Effectively with Legacy Code* (Ch. 6), Feathers describes **Wrap Met
 - The wrapper grows its own complex branching, becoming a second hard-to-test method.
 - You are using the wrapper to hide a design problem instead of addressing it.
 
+## The Kata
+
+### Background
+
+You are working in an HR system that manages employees, titles, and career levels. A downstream analytics service and a notifications service both want to know whenever someone is promoted, so the team has decided that **every successful promotion must publish a `PromotionEvent` onto an `EventBus`**.
+
+### Legacy Code Description
+
+`EmployeeService.promote()` contains untested business logic. It is hard to test because:
+
+- It loads and saves records through `EmployeeRepository.getInstance()`, a singleton whose `getInstance()` opens a **real database connection** and whose methods issue real SQL.
+- The service grabs that singleton directly inside `promote()` — there is no seam to inject a fake.
+- Changing the singleton (e.g. to make it injectable) is invasive and touches code you do not yet trust.
+
+You should not refactor the repository for this kata. Instead, add the new event-publishing behaviour around the existing logic.
+
+### Your Task
+
+Make every **successful** promotion publish a `PromotionEvent` to an `EventBus` created with `new EventBus()`, using **Wrap Method**:
+
+1. Rename the existing `promote` to a private `executePromotion` (keep its body unchanged).
+2. Add a new public `promote(employeeId: string, newTitle: string): void` wrapper with the identical signature.
+3. The wrapper calls `executePromotion` first, then publishes the `PromotionEvent`.
+
+**Added complexity:** if `executePromotion` throws a `PromotionError` (a rule fails) the event must **not** be published. Order the wrapper's calls so that `publish` runs only after the wrapped call succeeds — let the error propagate before reaching the publish step.
+
+### Acceptance Criteria
+
+- The public signature `promote(employeeId: string, newTitle: string): void` is unchanged; existing callers compile without edits.
+- A `PromotionEvent` is published exactly once after a successful promotion.
+- No event is published when `executePromotion` throws a `PromotionError`.
+- The original promotion logic still lives in `executePromotion` and is not modified.
+- `npm run typecheck` and `npm test` both pass.
+
+### Hints
+
+- Put the `this.executePromotion(...)` call before `this.eventBus.publish(...)`; a thrown error short-circuits the wrapper before publish runs.
+- You do not need a real database to test the wrapper — drive the test through a `promote` call that fails validation early to assert the "no publish" path, and inject/observe the `EventBus` to assert publishing.
+- Keep the wrapper tiny: delegate, then publish. All the gnarly rules stay in `executePromotion`.
+
 ## Steps to Apply the Technique
 
 1. **Identify the method to change.** Find the existing public method whose callers must keep working.
@@ -65,43 +105,3 @@ In *Working Effectively with Legacy Code* (Ch. 6), Feathers describes **Wrap Met
    ```
 
    Keep the signature of `promote` identical at every step so no caller has to change.
-
-## The Kata
-
-### Background
-
-You are working in an HR system that manages employees, titles, and career levels. A downstream analytics service and a notifications service both want to know whenever someone is promoted, so the team has decided that **every successful promotion must publish a `PromotionEvent` onto an `EventBus`**.
-
-### Legacy Code Description
-
-`EmployeeService.promote()` contains untested business logic. It is hard to test because:
-
-- It loads and saves records through `EmployeeRepository.getInstance()`, a singleton whose `getInstance()` opens a **real database connection** and whose methods issue real SQL.
-- The service grabs that singleton directly inside `promote()` — there is no seam to inject a fake.
-- Changing the singleton (e.g. to make it injectable) is invasive and touches code you do not yet trust.
-
-You should not refactor the repository for this kata. Instead, add the new event-publishing behaviour around the existing logic.
-
-### Your Task
-
-Make every **successful** promotion publish a `PromotionEvent` to an `EventBus` created with `new EventBus()`, using **Wrap Method**:
-
-1. Rename the existing `promote` to a private `executePromotion` (keep its body unchanged).
-2. Add a new public `promote(employeeId: string, newTitle: string): void` wrapper with the identical signature.
-3. The wrapper calls `executePromotion` first, then publishes the `PromotionEvent`.
-
-**Added complexity:** if `executePromotion` throws a `PromotionError` (a rule fails) the event must **not** be published. Order the wrapper's calls so that `publish` runs only after the wrapped call succeeds — let the error propagate before reaching the publish step.
-
-### Acceptance Criteria
-
-- The public signature `promote(employeeId: string, newTitle: string): void` is unchanged; existing callers compile without edits.
-- A `PromotionEvent` is published exactly once after a successful promotion.
-- No event is published when `executePromotion` throws a `PromotionError`.
-- The original promotion logic still lives in `executePromotion` and is not modified.
-- `npm run typecheck` and `npm test` both pass.
-
-### Hints
-
-- Put the `this.executePromotion(...)` call before `this.eventBus.publish(...)`; a thrown error short-circuits the wrapper before publish runs.
-- You do not need a real database to test the wrapper — drive the test through a `promote` call that fails validation early to assert the "no publish" path, and inject/observe the `EventBus` to assert publishing.
-- Keep the wrapper tiny: delegate, then publish. All the gnarly rules stay in `executePromotion`.

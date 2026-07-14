@@ -22,6 +22,34 @@ Sprout Method, from Michael Feathers' *Working Effectively with Legacy Code* (Ch
 - If the sprout needs so many parameters that it reveals the host method is doing too much.
 - When it is used as an excuse to permanently avoid addressing the underlying legacy design.
 
+## The Kata
+
+### Background
+
+A company runs a small payroll system. Every pay cycle, a `PayrollProcessor` takes a list of employees, computes each one's net pay from a tax table, and disburses the money through a banking integration. The code works in production but has no tests.
+
+### Legacy Code Description
+
+`PayrollProcessor.processPayroll(List<Employee> employees)` loops over employees, applies a hardcoded tax table to compute net pay, and pays each one. It is hard to test because it instantiates `new PaymentGateway()` directly inside the method, and that gateway makes real HTTP calls to a banking endpoint — so running the method in a test would hit the network. It also writes a summary line straight to `System.out`. There is no seam to intercept the payment or capture the output.
+
+### Your Task
+
+Before sending any payment, validate that the employee's bank account number matches a simple format rule: non-empty, numeric characters only, and between 6 and 34 digits in length. Employees with invalid account numbers must be **skipped** — no payment is sent for them. Implement the validation as a **sprouted, independently-testable method** — develop it test-first and only then wire it into the legacy loop.
+
+### Acceptance Criteria
+
+- Validation is extracted into a new, separate method that can be tested without touching `PaymentGateway` or the network.
+- The sprout method is covered by unit tests written test-first.
+- Employees with invalid account numbers are skipped and never passed to the gateway.
+- `processPayroll` keeps its `void` signature; the sprout's result is consumed inside the loop.
+- The original tax/payment logic for valid employees remains unchanged.
+
+### Hints
+
+- Test the sprout method in isolation; you should not need to call `processPayroll` (and thus the gateway) to test the validation rule.
+- Keep the sprout method's signature simple — pass in only what it needs (an account number, or the employee), and let it return its result.
+- Consider package-private visibility for the sprout method so the test in the same package can reach it directly.
+
 ## Steps to Apply the Technique
 
 1. **Identify where in the existing method you need the change.**
@@ -75,31 +103,3 @@ Sprout Method, from Michael Feathers' *Working Effectively with Legacy Code* (Ch
        continue; // skip payment for this employee
    }
    ```
-
-## The Kata
-
-### Background
-
-A company runs a small payroll system. Every pay cycle, a `PayrollProcessor` takes a list of employees, computes each one's net pay from a tax table, and disburses the money through a banking integration. The code works in production but has no tests.
-
-### Legacy Code Description
-
-`PayrollProcessor.processPayroll(List<Employee> employees)` loops over employees, applies a hardcoded tax table to compute net pay, and pays each one. It is hard to test because it instantiates `new PaymentGateway()` directly inside the method, and that gateway makes real HTTP calls to a banking endpoint — so running the method in a test would hit the network. It also writes a summary line straight to `System.out`. There is no seam to intercept the payment or capture the output.
-
-### Your Task
-
-Before sending any payment, validate that the employee's bank account number matches a simple format rule: non-empty, numeric characters only, and between 6 and 34 digits in length. Employees with invalid account numbers must be **skipped** — no payment is sent for them. Implement the validation as a **sprouted, independently-testable method** — develop it test-first and only then wire it into the legacy loop.
-
-### Acceptance Criteria
-
-- Validation is extracted into a new, separate method that can be tested without touching `PaymentGateway` or the network.
-- The sprout method is covered by unit tests written test-first.
-- Employees with invalid account numbers are skipped and never passed to the gateway.
-- `processPayroll` keeps its `void` signature; the sprout's result is consumed inside the loop.
-- The original tax/payment logic for valid employees remains unchanged.
-
-### Hints
-
-- Test the sprout method in isolation; you should not need to call `processPayroll` (and thus the gateway) to test the validation rule.
-- Keep the sprout method's signature simple — pass in only what it needs (an account number, or the employee), and let it return its result.
-- Consider package-private visibility for the sprout method so the test in the same package can reach it directly.
