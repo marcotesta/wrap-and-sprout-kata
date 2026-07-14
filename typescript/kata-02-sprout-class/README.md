@@ -38,27 +38,40 @@ In *Working Effectively with Legacy Code* (Ch. 6) Feathers asks: how do you add 
 
    ```ts
    let html = `<table>`;
-   // html += new QuarterlyReportTableHeader().generate();
+   // html += new QuarterlyReportTableHeader(this.languageCode).generate();
    ```
 
-3. **Determine which local variables it needs and pass them via the constructor.** (Here the header is static, so none are required; if it depended on, say, the quarter, you would pass it in.)
+3. **Determine which local variables the new class needs and pass them via the constructor.** The header is localised, so it depends on the report's language. That value already lives in the legacy class (read from the environment in the constructor) — gather it and pass it into the sprout.
 
    ```ts
-   // new QuarterlyReportTableHeader(/* e.g. this.quarter */)
+   // The header's column titles depend on the configured language:
+   // html += new QuarterlyReportTableHeader(this.languageCode).generate();
    ```
 
 4. **Determine whether it must return a value; if so add a method that supplies it and a call to receive it.** The header is needed as a string, so the sprout exposes `generate(): string` whose result is appended.
 
    ```ts
-   // const headerHtml = new QuarterlyReportTableHeader().generate();
+   // const headerHtml = new QuarterlyReportTableHeader(this.languageCode).generate();
    // html += headerHtml;
    ```
 
-5. **Develop the sprout class test-first.** Write the failing test in `tests/`, then implement `QuarterlyReportTableHeader` until it passes.
+5. **Develop the sprout class test-first (TDD).** Write the failing tests — one per language plus the fallback — then the minimal implementation that satisfies them.
 
    ```ts
-   it('generates a header row containing all four columns', () => {
-     expect(new QuarterlyReportTableHeader().generate()).toContain('<th>Department</th>');
+   it('renders English column titles', () => {
+     const header = new QuarterlyReportTableHeader('en');
+     expect(header.generate()).toBe(
+       '<tr><th>Department</th><th>Manager</th><th>Profit</th><th>Expenses</th></tr>',
+     );
+   });
+
+   it('renders Italian column titles', () => {
+     // ...
+     // '<tr><th>Reparto</th><th>Responsabile</th><th>Profitto</th><th>Spese</th></tr>'
+   });
+
+   it('falls back to English for an unknown language', () => {
+     // ...
    });
    ```
 
@@ -66,39 +79,43 @@ In *Working Effectively with Legacy Code* (Ch. 6) Feathers asks: how do you add 
 
    ```ts
    let html = `<table>`;
-   html += new QuarterlyReportTableHeader().generate();
+   html += new QuarterlyReportTableHeader(this.languageCode).generate();
    ```
 
 ## The Kata
 
 ### Background
 
-A quarterly reporting system produces an HTML financial report for each department: profit and expenses per manager, rendered as an HTML `<table>`.
+A quarterly reporting system produces an HTML financial report for each department: profit and expenses per manager, rendered as an HTML `<table>`. The report is localised: a configured language decides which language the labels are written in.
 
 ### Legacy Code Description
 
-`QuarterlyReportGenerator` in `src/quarterlyReportGenerator.ts` is hard to test. Its constructor directly `new`s a real `DatabaseConnection` (which opens a live connection) and reads configuration from `process.env`. There is no seam to inject a fake, so instantiating it in a unit test would hit the real database. Its `generate()` method queries the connection and builds the table rows, but currently emits **no header row**.
+`QuarterlyReportGenerator` in `src/quarterlyReportGenerator.ts` is hard to test. Its constructor directly `new`s a real `DatabaseConnection` (which opens a live connection) and reads configuration from `process.env` — including the report language from `REPORT_LANGUAGE`. There is no seam to inject a fake, so instantiating it in a unit test would hit the real database. Its `generate()` method queries the connection and builds the table rows, but currently emits **no header row**.
+
+The report is already localised, but in the worst possible way: the title, heading, and footer messages are translated by **hardcoded, inline logic inside `generate()`** (anything that is not Italian falls back to English). That inline translation is untestable from here for the very same reason — you cannot instantiate the class. This is the wart you must *not* copy when you add the header: instead of piling more inline localisation into the legacy method, you grow the header's localisation as a clean, independently tested sprout class.
 
 ### Your Task
 
-Add a header row to the table without untangling the legacy constructor. Create a NEW, separately-testable class `QuarterlyReportTableHeader` with a single `generate(): string` method (built test-first) that returns exactly:
+The HTML table must now include a header row whose **column titles are written in the report's configured language**. English (`"en"`) and Italian (`"it"`) must be supported, and any unknown, blank, or `undefined` language must fall back to English.
 
-```html
-<tr><th>Department</th><th>Manager</th><th>Profit</th><th>Expenses</th></tr>
+```
+en → <tr><th>Department</th><th>Manager</th><th>Profit</th><th>Expenses</th></tr>
+it → <tr><th>Reparto</th><th>Responsabile</th><th>Profitto</th><th>Spese</th></tr>
 ```
 
-Then call it from `QuarterlyReportGenerator.generate()` so the header appears immediately after the opening `<table>` tag.
+Rather than adding this logic inside the untestable `QuarterlyReportGenerator`, **sprout a new class** named `QuarterlyReportTableHeader`. It takes the language code as a constructor argument and exposes a single `generate(): string` method that returns the localised header row. Develop it test-first in `tests/quarterlyReportTableHeader.test.ts`, then call it from `QuarterlyReportGenerator.generate()` — passing the language read in the legacy constructor — so the header appears immediately after the opening `<table>` tag and before the first data row.
 
 ### Acceptance Criteria
 
-- A new class `QuarterlyReportTableHeader` exists with a single `generate(): string` method.
-- `QuarterlyReportTableHeader.generate()` returns exactly `<tr><th>Department</th><th>Manager</th><th>Profit</th><th>Expenses</th></tr>`.
-- The sprouted class is covered by tests that were written before its implementation (TDD).
-- `QuarterlyReportGenerator.generate()` calls the sprouted class and inserts the header after `<table>`.
-- `npm run typecheck` and `npm test` both pass; the legacy constructor is left untouched.
+- A new class `QuarterlyReportTableHeader` exists, taking a language code as a constructor argument and exposing a single `generate(): string` method.
+- `generate()` returns the header row with column titles localised to the given language: English and Italian are supported, and unknown / blank / `undefined` languages fall back to English.
+- The language-selection logic (including the fallback) is driven out **test-first (TDD)**, with tests covering each supported language and the fallback, and with no dependency on `DatabaseConnection` or the environment.
+- `QuarterlyReportGenerator.generate()` passes the language it read from the environment into the new class, so the localised header row sits between `<table>` and the first `<tr><td>...</td></tr>` data row.
+- `npm run typecheck` and `npm test` both pass; the legacy constructor is left untouched (no dependency injection or factory added).
 
 ### Hints
 
+- The sprout's only input is the language code — pass it as a constructor argument. Keep the class as small as the task allows while still owning the language logic.
+- Start from the `it.todo` in `tests/quarterlyReportTableHeader.test.ts`: write the tests first — one asserting the exact English row, one for Italian, and one proving an unknown language falls back to English. Watch them fail, then write the minimal `generate()` that passes.
+- A small map or switch from language code to the four column titles is enough — resist adding languages or configuration the acceptance criteria don't ask for.
 - You never need to instantiate `QuarterlyReportGenerator` (and thus the database) to test the header — that is the whole point of sprouting.
-- Start from the `it.todo` in `tests/quarterlyReportTableHeader.test.ts`: turn it into a real failing test first, then implement.
-- Keep `QuarterlyReportTableHeader` dependency-free — no constructor arguments are needed for a static header.

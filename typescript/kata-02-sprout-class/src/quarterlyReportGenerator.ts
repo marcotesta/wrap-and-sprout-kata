@@ -50,6 +50,8 @@ export class DatabaseConnection {
 export class QuarterlyReportGenerator {
   private readonly connection: DatabaseConnection;
   private readonly quarter: string;
+  private readonly companyName: string | undefined;
+  private readonly languageCode: string | undefined;
 
   constructor() {
     // Tight coupling to an external dependency, created right here.
@@ -61,6 +63,9 @@ export class QuarterlyReportGenerator {
 
     this.connection = new DatabaseConnection(host, port, database, user, password);
     this.quarter = process.env.REPORT_QUARTER ?? 'Q1';
+    this.companyName = process.env.REPORT_COMPANY_NAME;
+    // The report is localised: this drives the language of the report labels.
+    this.languageCode = process.env.REPORT_LANGUAGE;
   }
 
   generate(): string {
@@ -68,10 +73,29 @@ export class QuarterlyReportGenerator {
       `SELECT department, manager, profit, expenses FROM financials WHERE quarter = '${this.quarter}'`,
     );
 
-    let html = `<table>`;
-    // TODO (kata): a header row produced by the sprouted
-    // QuarterlyReportTableHeader class must be inserted here, e.g.:
-    // html += new QuarterlyReportTableHeader().generate();
+    // Legacy inline localization: report is currently translated right here,
+    // in this untestable class. This is exactly the kind of hardcoded logic
+    // you cannot easily cover with tests from here — which is why
+    // the new header row is grown as a separate, tested sprout class.
+    const reportTitle = reportTitleFor(this.languageCode);
+
+    let html = `<html>`;
+    html += `<head>`;
+    html += `<title>${reportTitle}</title>`;
+    html += `</head>`;
+    html += `<body>`;
+    html += `<h1>${reportTitle}</h1>`;
+
+    if (this.companyName !== undefined && this.companyName.trim() !== '') {
+      html += `<h2>${this.companyName}</h2>`;
+    }
+
+    html += `<table>`;
+
+    // TODO (kata): a localised header row must be produced here by a sprouted class.
+    // The column titles depend on `languageCode`, so pass it to the new class.
+    // Today the table jumps straight into the data rows with no header.
+
     for (const row of rows) {
       html += `<tr>`;
       html += `<td>${row.department}</td>`;
@@ -80,7 +104,38 @@ export class QuarterlyReportGenerator {
       html += `<td>${row.expenses}</td>`;
       html += `</tr>`;
     }
+
     html += `</table>`;
+
+    if (rows.length === 0) {
+      html += `<p>${noResultLabelFor(this.languageCode)}</p>`;
+    } else {
+      html += `<p>${totalRowsLabelFor(this.languageCode)}${rows.length}</p>`;
+    }
+
+    html += `</body>`;
+    html += `</html>`;
     return html;
   }
+}
+
+function totalRowsLabelFor(languageCode: string | undefined): string {
+  if (languageCode?.toLowerCase() === 'it')
+    return 'Righe totali: ';
+
+  return 'Total rows: ';
+}
+
+function reportTitleFor(languageCode: string | undefined): string {
+  if (languageCode?.toLowerCase() === 'it')
+    return 'Report Trimestrale';
+
+  return 'Quarterly Report';
+}
+
+function noResultLabelFor(languageCode: string | undefined): string {
+  if (languageCode?.toLowerCase() === 'it')
+    return 'Nessun risultato disponibile per questo trimestre.';
+
+  return 'No results available for this quarter.';
 }
