@@ -49,28 +49,25 @@ export class DatabaseConnection {
 
 export class QuarterlyReportGenerator {
   private readonly connection: DatabaseConnection;
-  private readonly quarter: string;
   private readonly companyName: string | undefined;
   private readonly languageCode: string | undefined;
 
   constructor() {
     // Tight coupling to an external dependency, created right here.
-    const host = process.env.DB_HOST ?? 'localhost';
-    const port = Number(process.env.DB_PORT ?? '5432');
-    const database = process.env.DB_NAME ?? 'reporting';
-    const user = process.env.DB_USER ?? 'reporter';
-    const password = process.env.DB_PASSWORD ?? '';
+    const host = process.env.REPORTING_DB_HOST ?? 'localhost';
+    const port = Number(process.env.REPORTING_DB_PORT ?? '5432');
+    const database = process.env.REPORTING_DB_NAME ?? 'reporting';
+    const user = process.env.REPORTING_DB_USER ?? 'reporter';
+    const password = process.env.REPORTING_DB_PASSWORD ?? '';
 
     this.connection = new DatabaseConnection(host, port, database, user, password);
-    this.quarter = process.env.REPORT_QUARTER ?? 'Q1';
-    this.companyName = process.env.REPORT_COMPANY_NAME;
-    // The report is localised: this drives the language of the report labels.
-    this.languageCode = process.env.REPORT_LANGUAGE;
+    this.companyName = process.env.REPORTING_COMPANY_NAME;
+    this.languageCode = process.env.REPORTING_LANGUAGE;
   }
 
   generate(): string {
     const rows = this.connection.query(
-      `SELECT department, manager, profit, expenses FROM financials WHERE quarter = '${this.quarter}'`,
+      `SELECT department, manager, profit, expenses FROM financials`,
     );
 
     // Legacy inline localization: report is currently translated right here,
