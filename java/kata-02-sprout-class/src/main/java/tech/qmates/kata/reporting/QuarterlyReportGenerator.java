@@ -21,6 +21,7 @@ public class QuarterlyReportGenerator {
 
     private final DatabaseConnection databaseConnection;
     private final String companyName;
+    private final String languageCode;
 
     public QuarterlyReportGenerator() {
         // Configuration is read from the environment at construction time.
@@ -28,6 +29,7 @@ public class QuarterlyReportGenerator {
         String username = System.getenv("REPORTING_DB_USER");
         String password = System.getenv("REPORTING_DB_PASSWORD");
         this.companyName = System.getenv("REPORTING_COMPANY_NAME");
+        this.languageCode = System.getenv("REPORTING_LANGUAGE");
 
         // A real database connection is created right here, in the constructor.
         this.databaseConnection = new DatabaseConnection(jdbcUrl, username, password);
@@ -36,13 +38,19 @@ public class QuarterlyReportGenerator {
     public String generate() {
         List<DepartmentRow> rows = databaseConnection.queryQuarterlyRows();
 
+        // Legacy inline localization: report is currently translated right here,
+        // in this untestable class. This exactly the kind  of hardcoded logic
+        // you cannot easily cover with tests from here — which is why
+        // the new header row is grown as a separate, tested sprout class.
+        String reportTitle = reportTitleFor(languageCode);
+
         StringBuilder html = new StringBuilder();
         html.append("<html>");
         html.append("<head>");
-        html.append("<title>Quarterly Report</title>");
+        html.append("<title>").append(reportTitle).append("</title>");
         html.append("</head>");
         html.append("<body>");
-        html.append("<h1>Quarterly Report</h1>");
+        html.append("<h1>").append(reportTitle).append("</h1>");
 
         if (companyName != null && !companyName.isBlank()) {
             html.append("<h2>").append(companyName).append("</h2>");
@@ -50,7 +58,8 @@ public class QuarterlyReportGenerator {
 
         html.append("<table>");
 
-        // TODO (kata): a header row must be produced here by a sprouted class.
+        // TODO (kata): a localised header row must be produced here by a sprouted class.
+        // The column titles depend on `languageCode`, so pass it to the new class.
         // Today the table jumps straight into the data rows with no header.
 
         for (DepartmentRow row : rows) {
@@ -65,9 +74,9 @@ public class QuarterlyReportGenerator {
         html.append("</table>");
 
         if (rows.isEmpty()) {
-            html.append("<p>No results available for this quarter.</p>");
+            html.append("<p>").append(noResultLabelFor(languageCode)).append("</p>");
         } else {
-            html.append("<p>Total rows: ").append(rows.size()).append("</p>");
+            html.append("<p>").append(totalRowsLabelFor(languageCode)).append(rows.size()).append("</p>");
         }
 
         html.append("</body>");
@@ -75,4 +84,26 @@ public class QuarterlyReportGenerator {
 
         return html.toString();
     }
+
+    private static String totalRowsLabelFor(String languageCode) {
+        if ("it".equalsIgnoreCase(languageCode))
+            return "Righe totali: ";
+
+        return "Total rows: ";
+    }
+
+    private static String reportTitleFor(String languageCode) {
+        if ("it".equalsIgnoreCase(languageCode))
+            return "Report Trimestrale";
+
+        return "Quarterly Report";
+    }
+
+    private static String noResultLabelFor(String languageCode) {
+        if ("it".equalsIgnoreCase(languageCode))
+            return "Nessun risultato disponibile per questo trimestre.";
+
+        return "No results available for this quarter.";
+    }
+
 }
