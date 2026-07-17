@@ -117,7 +117,6 @@ Make every **successful** promotion publish a `PromotionEvent` to the `EventBus`
        employeeId,
        toTitle: newTitle,
        newLeadership,
-       occurredAt: new Date(),
      });
    }
    ```

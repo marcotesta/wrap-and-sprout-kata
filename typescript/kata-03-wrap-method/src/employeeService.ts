@@ -25,7 +25,6 @@ export type PromotionEvent = {
   employeeId: string;
   toTitle: string;
   newLeadership: boolean;
-  occurredAt: Date;
 };
 
 export class PromotionError extends Error {
