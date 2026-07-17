@@ -50,7 +50,7 @@ Because `OrderProcessor` implements no interface, your **first** step is to **Ex
 
 - Start by extracting `IOrderProcessor` from `OrderProcessor` — without a shared interface the wrapper has nothing to delegate through.
 - Write the test first: inject a fake/slow `IOrderProcessor` and a spy `Logger` so you control timing without real I/O.
-- Keep `TimingOrderProcessor` thin — it should only measure and (conditionally) warn; all real work stays behind `this.inner`.
+- Keep `TimingOrderProcessor` thin — it should only measure and (conditionally) warn; all real work stays behind `this.wrapped`.
 
 ## Steps to Apply the Technique
 
@@ -77,12 +77,12 @@ Because `OrderProcessor` implements no interface, your **first** step is to **Ex
 
    ```ts
    export class TimingOrderProcessor implements IOrderProcessor {
-     constructor(private readonly inner: IOrderProcessor) {}
+     constructor(private readonly wrapped: IOrderProcessor) {}
 
      placeOrder(order: Order): void {
-       this.inner.placeOrder(order);
+       this.wrapped.placeOrder(order);
      }
-     // delegate the remaining methods to this.inner
+     // delegate the remaining methods to this.wrapped
    }
    ```
 
@@ -91,7 +91,7 @@ Because `OrderProcessor` implements no interface, your **first** step is to **Ex
    ```ts
    placeOrder(order: Order): void {
      const start = Date.now();
-     this.inner.placeOrder(order);
+     this.wrapped.placeOrder(order);
      const elapsed = Date.now() - start;
      if (elapsed > 2000) {
        new Logger().warn(`placeOrder took ${elapsed}ms for ${order.id}`);
