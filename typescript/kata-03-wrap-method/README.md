@@ -46,6 +46,8 @@ Make every **successful** promotion publish a `PromotionEvent` to the `EventBus`
 2. Add a new public `promote(employeeId: string, newTitle: string): void` wrapper with the identical signature that calls `executePromotion` and then publishes the event.
 3. Put the publishing in its own small method that takes an `EventBus` parameter, so you can develop it **test-first**. In the wrapper, inject a `new RealEventBus()`; in the tests, inject a `new ObservableEventBus()`.
 
+**The behaviour to grow (test-first):** the published event carries a `newLeadership` flag. It is `true` when the new title names a **leadership role** — `newTitle` starts (case-insensitively) with `Head`, `Chief`, or `Manager` — and `false` otherwise. This small rule is the logic you drive out with tests, one branch at a time.
+
 **Added complexity (ordering):** if `executePromotion` throws a `PromotionError` (a rule fails) the event must **not** be published. Put the publish call *after* the wrapped call and let the error propagate: a promotion that fails never reaches the publish line. This is a property of how you order the wrapper, not something you unit-test through the database.
 
 **How to test it (test-first):** do **not** call `promote` in your tests — that runs the legacy code and opens the production database. The new publishing method is self-contained: create an `ObservableEventBus`, pass it in, call the method directly, and assert on its `publishedEvents()`. Constructing `EmployeeService` is cheap (only `promote`/`executePromotion` touch the DB), so you can `new EmployeeService()` in a test and exercise the new method with no database, mocks, or subclassing.
@@ -57,6 +59,7 @@ Make every **successful** promotion publish a `PromotionEvent` to the `EventBus`
 - The new publishing behaviour lives in its own method that takes an `EventBus` parameter; the wrapper injects a `RealEventBus`, and the tests inject an `ObservableEventBus`.
 - The new method is covered by tests written before its implementation (TDD), with **no database access** — the tests never call `promote` and never trigger `EmployeeRepository.getInstance()`.
 - In the wrapper the publish call sits *after* `executePromotion(...)`, so a successful promotion publishes exactly one `PromotionEvent` and a failing one publishes none.
+- The published `PromotionEvent` carries a `newLeadership` flag derived from `newTitle` (true when it starts with `Head`, `Chief`, or `Manager`, case-insensitive), grown test-first with a test per branch.
 - `npm run typecheck` and `npm test` both pass.
 
 ### Hints
@@ -64,6 +67,7 @@ Make every **successful** promotion publish a `PromotionEvent` to the `EventBus`
 - Order matters: call `executePromotion(...)` *first*; publish only on the line after it returns. Because a thrown `PromotionError` skips the rest of the method, placing the publish last gives you "no event on failure" for free — no try/catch needed.
 - Make the new method testable by design: accept an `EventBus` parameter instead of constructing one inside it. The wrapper injects a `RealEventBus`; a test injects an `ObservableEventBus` and reads back its `publishedEvents()`.
 - Test the new method on a plain `new EmployeeService()`. You do **not** need to call `promote`, mock the repository, or subclass anything.
+- The `newLeadership` rule is a case-insensitive prefix check against `Head`/`Chief`/`Manager`: write one test for a leadership title, one for a non-leadership title, and one proving the match ignores case.
 
 ## Steps to Apply the Technique
 
@@ -107,10 +111,12 @@ Make every **successful** promotion publish a `PromotionEvent` to the `EventBus`
    }
 
    publishPromotionEvent(eventBus: EventBus, employeeId: string, newTitle: string): void {
+     const newLeadership = /* true when newTitle names a leadership role — see Your Task */;
      eventBus.publish({
        type: 'employee.promoted',
        employeeId,
        toTitle: newTitle,
+       newLeadership,
        occurredAt: new Date(),
      });
    }
@@ -123,10 +129,13 @@ Make every **successful** promotion publish a `PromotionEvent` to the `EventBus`
    ```ts
    import { ObservableEventBus } from './observableEventBus';
 
-   it('publishes a PromotionEvent', () => {
+   it('sets newLeadership = true for a leadership title', () => {
      const bus = new ObservableEventBus();
-     new EmployeeService().publishPromotionEvent(bus, 'E-1', 'Senior Engineer');
-     // assert bus.publishedEvents() holds exactly one PromotionEvent
-     // for 'E-1' with toTitle 'Senior Engineer'
+     new EmployeeService().publishPromotionEvent(bus, 'E-1', 'Head of Sales');
+     // assert bus.publishedEvents() holds one PromotionEvent whose toTitle is
+     // 'Head of Sales' and whose newLeadership flag is true
    });
+   // then, test-first, add the other branches:
+   //   'Senior Engineer' -> newLeadership false
+   //   'chief of staff'  -> newLeadership true (case-insensitive)
    ```

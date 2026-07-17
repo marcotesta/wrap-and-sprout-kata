@@ -40,6 +40,8 @@ Every **successful** promotion must now publish a `PromotionEvent` to the `Event
 2. Create a new public `promote(String, String)` with the identical signature that calls `executePromotion` and then publishes the event.
 3. Put the publishing in its own small method that takes an `EventBus` parameter, so you can develop it **test-first**. In the wrapper, inject a `new RealEventBus()`; in the tests, inject a `new ObservableEventBus()`.
 
+**The behaviour to grow (test-first):** the published event carries a `newLeadership` flag. It is `true` when the new title names a **leadership role** — `newTitle` starts (case-insensitively) with `Head`, `Chief`, or `Manager` — and `false` otherwise. This small rule is the logic you drive out with tests, one branch at a time.
+
 **Added complexity (ordering):** if `executePromotion` throws a `PromotionException`, the event must **NOT** be published. Put the publish call *after* the wrapped call and let the exception propagate: a promotion that fails never reaches the publish line. This is a property of how you order the wrapper, not something you unit-test through the database.
 
 **How to test it (test-first):** do **not** call `promote` in your tests — that runs the legacy code and opens the production database. The new publishing method is self-contained: create an `ObservableEventBus`, pass it in, call the method directly, and assert on its `publishedEvents()`. Constructing `EmployeeService` is cheap (only `promote`/`executePromotion` touch the DB), so you can `new EmployeeService()` in a test and exercise the new method with no database, mocks, or subclassing.
@@ -51,12 +53,14 @@ Every **successful** promotion must now publish a `PromotionEvent` to the `Event
 - The new publishing behaviour lives in its own method (public or package-private) that takes an `EventBus` parameter; the wrapper injects a `RealEventBus`, and the tests inject an `ObservableEventBus`.
 - The new method is covered by tests written before its implementation (TDD), with **no database access** — the tests never call `promote` and never trigger `EmployeeRepository.getInstance()`.
 - In the wrapper the publish call sits *after* `executePromotion(...)`, so a successful promotion publishes exactly one `PromotionEvent` and a failing one publishes none.
+- The published `PromotionEvent` carries a `newLeadership` flag derived from `newTitle` (true when it starts with `Head`, `Chief`, or `Manager`, case-insensitive), grown test-first with a test per branch.
 
 ### Hints
 
 - Order matters: call `executePromotion(...)` *first*; publish only on the line after it returns. Because a thrown `PromotionException` skips the rest of the method, placing the publish last gives you "no event on failure" for free — no try/catch needed.
 - Make the new method testable by design: accept an `EventBus` parameter instead of constructing one inside it. The wrapper injects a `RealEventBus`; a test injects an `ObservableEventBus` and reads back its `publishedEvents()`.
 - Keep the new method package-private so the same-package test can call it directly. You do **not** need to call `promote`, mock the repository, or subclass anything — just test the method on a plain `new EmployeeService()`.
+- The `newLeadership` rule is a case-insensitive prefix check against `Head`/`Chief`/`Manager`: write one test for a leadership title, one for a non-leadership title, and one proving the match ignores case.
 
 ## Steps to Apply the Technique
 
@@ -95,7 +99,8 @@ Every **successful** promotion must now publish a `PromotionEvent` to the `Event
    }
 
    void publishPromotionEvent(EventBus eventBus, String employeeId, String newTitle) {
-       eventBus.publish(new PromotionEvent(employeeId, newTitle));
+       boolean newLeadership = /* true when newTitle names a leadership role — see Your Task */;
+       eventBus.publish(new PromotionEvent(employeeId, newTitle, newLeadership));
    }
    ```
 
@@ -105,10 +110,13 @@ Every **successful** promotion must now publish a `PromotionEvent` to the `Event
    Never call `promote` in a test — it would run `executePromotion` and hit the database. The new method is self-contained: hand it an `ObservableEventBus`, call it directly, and assert on what it published.
    ```java
    @Test
-   void publishesPromotionEvent() {
+   void setsLeadershipFlagForLeadershipTitle() {
        ObservableEventBus bus = new ObservableEventBus();
-       new EmployeeService().publishPromotionEvent(bus, "E-1", "Senior Engineer");
-       // assert bus.publishedEvents() holds exactly one PromotionEvent
-       // whose employeeId is "E-1" and newTitle is "Senior Engineer"
+       new EmployeeService().publishPromotionEvent(bus, "E-1", "Head of Sales");
+       // assert bus.publishedEvents() holds one PromotionEvent whose newTitle is
+       // "Head of Sales" and whose newLeadership flag is true
    }
+   // then, test-first, add the other branches:
+   //   "Senior Engineer" -> newLeadership false
+   //   "chief of staff"  -> newLeadership true (case-insensitive)
    ```

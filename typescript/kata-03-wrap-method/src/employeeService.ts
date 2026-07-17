@@ -24,6 +24,7 @@ export type PromotionEvent = {
   type: 'employee.promoted';
   employeeId: string;
   toTitle: string;
+  newLeadership: boolean;
   occurredAt: Date;
 };
 
