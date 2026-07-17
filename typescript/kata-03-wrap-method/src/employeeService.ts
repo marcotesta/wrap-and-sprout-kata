@@ -36,7 +36,7 @@ export class PromotionError extends Error {
 }
 
 // Publishes domain events. Two implementations exist: RealEventBus (production —
-// its `publish` performs a genuine side effect) and, under `tests/`, an
+// not wired up in this kata, so it throws) and, under `tests/`, an
 // ObservableEventBus that merely records what was published so tests can assert
 // on it — no database, no mocking framework.
 //
@@ -46,18 +46,15 @@ export interface EventBus {
   publish(event: unknown): void;
 }
 
-// Production EventBus. In a real system `publish` would push to a message broker
-// / outbox — a genuine, irreversible side effect.
-//
-// Here it deliberately throws: if this runs inside a test, you accidentally
-// triggered a real publication. Inject an ObservableEventBus in tests instead,
-// and keep this one for the wrapper's production wiring.
+// Production EventBus. In a real system `publish` fans out to a message broker.
+// That infrastructure is not wired up in this kata, so it throws: reaching it
+// means you are on the real production path. In tests, inject an
+// ObservableEventBus instead.
 export class RealEventBus implements EventBus {
   publish(event: unknown): void {
     throw new Error(
-      'RealEventBus.publish performed a REAL publication (message broker / subscribers). ' +
-        'This must never run in a test — inject an ObservableEventBus and assert on ' +
-        'its publishedEvents() instead.',
+      'RealEventBus is the production bus and is not wired up in this kata. ' +
+        'Inject an ObservableEventBus in tests and assert on its publishedEvents().',
     );
   }
 }

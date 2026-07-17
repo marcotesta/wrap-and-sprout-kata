@@ -2,7 +2,7 @@ package tech.qmates.kata.hr;
 
 /**
  * Publishes domain events. There are two implementations: {@link RealEventBus}
- * for production (its {@code publish} performs a genuine side effect) and, under
+ * for production (not wired up in this kata, so it throws) and, under
  * {@code src/test}, an {@code ObservableEventBus} that merely records what was
  * published so tests can assert on it — no database, no mocking framework.
  *

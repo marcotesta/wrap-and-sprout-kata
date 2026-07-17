@@ -36,17 +36,17 @@ You are working in an HR system that manages employees, titles, and career level
 - The service grabs that singleton directly inside `promote()` — there is no seam to inject a fake.
 - Changing the singleton (e.g. to make it injectable) is invasive and touches code you do not yet trust.
 
-You should not refactor the repository for this kata. Instead, add the new event-publishing behaviour around the existing logic.
+You should not refactor it for this kata. Instead, add the new event-publishing behaviour around the existing logic.
 
 ### Your Task
 
-Make every **successful** promotion publish a `PromotionEvent` to the `EventBus`. `EventBus` is an interface with two implementations: `RealEventBus` (production — its `publish` performs a genuine side effect) and, under `tests/`, `ObservableEventBus` (test-only — it records what was published). Apply **Wrap Method**:
+Make every **successful** promotion publish a `PromotionEvent` to the `EventBus`. `EventBus` is an interface with two implementations: `RealEventBus` (production — not wired up in this kata, so it throws) and, under `tests/`, `ObservableEventBus` (test-only — it records what was published). Apply **Wrap Method**:
 
 1. Rename the existing `promote` to a private `executePromotion` (keep its body unchanged).
 2. Add a new public `promote(employeeId: string, newTitle: string): void` wrapper with the identical signature that calls `executePromotion` and then publishes the event.
 3. Put the publishing in its own small method that takes an `EventBus` parameter, so you can develop it **test-first**. In the wrapper, inject a `new RealEventBus()`; in the tests, inject a `new ObservableEventBus()`.
 
-**The behaviour to grow (test-first):** the published event carries a `newLeadership` flag. It is `true` when the new title names a **leadership role** — `newTitle` starts (case-insensitively) with `Head`, `Chief`, or `Manager` — and `false` otherwise. This small rule is the logic you drive out with tests, one branch at a time.
+**The behaviour to grow (test-first):** the published event carries a `newLeadership` flag. It is `true` when the new title names a **leadership role** — `newTitle` starts (case-insensitively) with `Head`, `Chief`, or `Manager` — and `false` otherwise. It is a deliberately simple rule; don't over-think the edge cases. This is the logic you drive out with tests, one branch at a time.
 
 **Added complexity (ordering):** if `executePromotion` throws a `PromotionError` (a rule fails) the event must **not** be published. Put the publish call *after* the wrapped call and let the error propagate: a promotion that fails never reaches the publish line. This is a property of how you order the wrapper, not something you unit-test through the database.
 
@@ -58,7 +58,8 @@ Make every **successful** promotion publish a `PromotionEvent` to the `EventBus`
 - The original promotion logic is preserved verbatim inside a private `executePromotion(...)` method.
 - The new publishing behaviour lives in its own method that takes an `EventBus` parameter; the wrapper injects a `RealEventBus`, and the tests inject an `ObservableEventBus`.
 - The new method is covered by tests written before its implementation (TDD), with **no database access** — the tests never call `promote` and never trigger `EmployeeRepository.getInstance()`.
-- In the wrapper the publish call sits *after* `executePromotion(...)`, so a successful promotion publishes exactly one `PromotionEvent` and a failing one publishes none.
+- An isolated test asserts the new method publishes exactly one `PromotionEvent`.
+- The wrapper publishes only *after* `executePromotion(...)` succeeds. So a failing promotion publishes nothing — guaranteed by construction, not by a test.
 - The published `PromotionEvent` carries a `newLeadership` flag derived from `newTitle` (true when it starts with `Head`, `Chief`, or `Manager`, case-insensitive), grown test-first with a test per branch.
 - `npm run typecheck` and `npm test` both pass.
 
