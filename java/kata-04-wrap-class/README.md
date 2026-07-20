@@ -34,22 +34,25 @@ We run an e-commerce platform. The `OrderProcessor` is the heart of order manage
 
 ### Your Task
 
-Every call to `placeOrder(Order order)` must be **timed**. If it takes longer than **2000ms**, log a warning via `Logger` (created with `new Logger()` and its `warn(String)` method). This timing/logging must **not** be mixed into `OrderProcessor`.
+Every call to `placeOrder(Order order)` must be **timed**. If it takes longer than **2000ms**, log a warning via `Logger` and its `warn(String)` method. This timing/logging must **not** be mixed into `OrderProcessor`.
+
+**Inject** the `Logger` into the wrapper — do not create it inside `placeOrder`. Pass a `new Logger()` in production wiring. For tests, pass a `Logger` you can observe — for example a subclass that overrides `warn` to record the messages, or extract an interface for `Logger` and pass a recording implementation — so you can assert on them without capturing the console.
 
 Apply **Wrap Class**: build a `TimingOrderProcessor` that holds an order processor and decorates `placeOrder`. Because `OrderProcessor` implements no interface, your **first** step is to **Extract an Interface** (e.g. `IOrderProcessor`) from `OrderProcessor` so that both the original and your wrapper implement the same contract — without this, the wrapper has nothing to delegate to and nothing to substitute in tests.
 
 ### Acceptance Criteria
 
 - An interface (e.g. `IOrderProcessor`) is extracted, and `OrderProcessor` is changed only to add `implements IOrderProcessor` (no logic changes).
-- `TimingOrderProcessor implements IOrderProcessor`, takes an `IOrderProcessor` via its constructor, and delegates every method to it.
-- `placeOrder` is timed and a single warning is logged via `Logger.warn` only when it exceeds 2000ms; nothing is logged when it is fast.
+- `TimingOrderProcessor implements IOrderProcessor`, takes an `IOrderProcessor` **and a `Logger`** via its constructor, and delegates every method to it.
+- `placeOrder` is timed and a single warning is logged via the injected `Logger.warn` only when it exceeds 2000ms; nothing is logged when it is fast.
 - The timing/logging logic lives entirely in the wrapper — `OrderProcessor` contains no timing or `Logger` code.
-- The behaviour is proven by tests written test-first, driven against a fake `IOrderProcessor` and a capturing `Logger` (no real DB/SMTP/HTTP).
+- The behaviour is proven by tests written test-first, driven against a fake `IOrderProcessor` and a `Logger` you can observe — a recording subclass, or a recording implementation of an interface you extract for `Logger` (no real DB/SMTP/HTTP, no console capturing).
 
 ### Hints
 
 - Extract the interface first; let your IDE generate it from `OrderProcessor`'s public methods, then add `implements IOrderProcessor`. The wrapper depends on the interface, never on the concrete class.
-- Make `Logger` injectable into the wrapper (or extract its threshold) so a test can capture warnings; keep the default `new Logger()` for production wiring.
+- Inject the `Logger` through the wrapper's constructor — do not `new Logger()` inside `placeOrder`, or a test cannot observe the warning. Pass `new Logger()` in production wiring.
+- Make the `Logger` observable in tests: either a subclass that overrides `warn(String)` to store messages, or extract an interface for `Logger` and pass a recording implementation. Inject it and assert on the captured list — no console capturing.
 - Test the wrapper against a hand-written slow/fast fake `IOrderProcessor` so you never touch the real `OrderRepository`, `EmailService` or `InventoryService`.
 
 ## Steps to Apply the Technique
@@ -77,9 +80,11 @@ Apply **Wrap Class**: build a `TimingOrderProcessor` that holds an order process
    ```java
    public class TimingOrderProcessor implements IOrderProcessor {
        private final IOrderProcessor delegate;
+       private final Logger logger;
 
-       public TimingOrderProcessor(IOrderProcessor delegate) {
+       public TimingOrderProcessor(IOrderProcessor delegate, Logger logger) {
            this.delegate = delegate;
+           this.logger = logger;
        }
 
        @Override
@@ -105,9 +110,18 @@ Apply **Wrap Class**: build a `TimingOrderProcessor` that holds an order process
    }
    ```
 
-5. **Instantiate the wrapper where you want the new behaviour enabled.** Other call sites keep using the bare original.
+   In the test, inject a fake `IOrderProcessor` and a `Logger` you can observe, then assert on the captured warnings. The simplest observable `Logger` is a subclass that records `warn` calls:
 
    ```java
-   IOrderProcessor processor = new TimingOrderProcessor(new OrderProcessor());
+   class RecordingLogger extends Logger {
+       final List<String> warnings = new ArrayList<>();
+       @Override public void warn(String message) { warnings.add(message); }
+   }
+   ```
+
+5. **Instantiate the wrapper where you want the new behaviour enabled.** Other call sites keep using the bare original. Inject the production `Logger` here.
+
+   ```java
+   IOrderProcessor processor = new TimingOrderProcessor(new OrderProcessor(), new Logger());
    processor.placeOrder(order); // now timed + logged
    ```

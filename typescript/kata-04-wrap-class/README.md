@@ -34,22 +34,25 @@ An e-commerce platform processes customer orders: it validates them, calculates 
 
 ### Your Task
 
-Every call to `placeOrder(order)` must be **timed**; if it takes longer than **2000ms**, log a warning through `Logger` (`new Logger()`). The timing and logging logic must **not** be mixed into `OrderProcessor`. Apply the **Wrap Class** technique: build a `TimingOrderProcessor` that holds an `IOrderProcessor` and decorates `placeOrder`.
+Every call to `placeOrder(order)` must be **timed**; if it takes longer than **2000ms**, log a warning through a `Logger`. The timing and logging logic must **not** be mixed into `OrderProcessor`. Apply the **Wrap Class** technique: build a `TimingOrderProcessor` that holds an `IOrderProcessor` and decorates `placeOrder`.
+
+`Logger` is an interface with a `ConsoleLogger` implementation for production. **Inject** a `Logger` into the wrapper — pass a `new ConsoleLogger()` in production wiring. For tests, write your own small `Logger` that records the warnings, so you can assert on them without spying on the console.
 
 Because `OrderProcessor` implements no interface, your **first** step is to **Extract an Interface** (`IOrderProcessor`) so that the original class and your wrapper share a contract: `class OrderProcessor implements IOrderProcessor` and `class TimingOrderProcessor implements IOrderProcessor`. Only the interface extraction may touch the original file; the behaviour of `OrderProcessor` stays the same.
 
 ### Acceptance Criteria
 
 - An `IOrderProcessor` interface is extracted and implemented by `OrderProcessor` (its behaviour unchanged otherwise).
-- A `TimingOrderProcessor` implements `IOrderProcessor`, takes an `IOrderProcessor` in its constructor, and delegates every method.
-- `placeOrder` is timed; a warning is logged via `Logger` only when it exceeds 2000ms, and not when it is fast.
+- A `TimingOrderProcessor` implements `IOrderProcessor`, takes an `IOrderProcessor` **and a `Logger`** in its constructor, and delegates every method.
+- `placeOrder` is timed; a warning is logged via the injected `Logger` only when it exceeds 2000ms, and not when it is fast.
 - No timing or logging code lives inside `OrderProcessor`.
+- The behaviour is proven by tests written test-first, using a fake `IOrderProcessor` and a recording `Logger` you implement (no real I/O, no console spying).
 - `npm run typecheck` and `npm test` both pass.
 
 ### Hints
 
 - Start by extracting `IOrderProcessor` from `OrderProcessor` — without a shared interface the wrapper has nothing to delegate through.
-- Write the test first: inject a fake/slow `IOrderProcessor` and a spy `Logger` so you control timing without real I/O.
+- Write the test first: inject a fake/slow `IOrderProcessor` and a recording `Logger` — a tiny class implementing the `Logger` interface that stores each `warn` message — then assert on the captured messages. No console spying, no real I/O.
 - Keep `TimingOrderProcessor` thin — it should only measure and (conditionally) warn; all real work stays behind `this.wrapped`.
 
 ## Steps to Apply the Technique
@@ -77,7 +80,10 @@ Because `OrderProcessor` implements no interface, your **first** step is to **Ex
 
    ```ts
    export class TimingOrderProcessor implements IOrderProcessor {
-     constructor(private readonly wrapped: IOrderProcessor) {}
+     constructor(
+       private readonly wrapped: IOrderProcessor,
+       private readonly logger: Logger,
+     ) {}
 
      placeOrder(order: Order): void {
        this.wrapped.placeOrder(order);
@@ -86,7 +92,7 @@ Because `OrderProcessor` implements no interface, your **first** step is to **Ex
    }
    ```
 
-4. **Add the new behaviour around the target method, test-first.**
+4. **Add the new behaviour around the target method, test-first.** Warn through the *injected* `logger`, never a `new Logger()` inside the method — that is what lets a test observe it.
 
    ```ts
    placeOrder(order: Order): void {
@@ -94,14 +100,25 @@ Because `OrderProcessor` implements no interface, your **first** step is to **Ex
      this.wrapped.placeOrder(order);
      const elapsed = Date.now() - start;
      if (elapsed > 2000) {
-       new Logger().warn(`placeOrder took ${elapsed}ms for ${order.id}`);
+       this.logger.warn(`placeOrder took ${elapsed}ms for ${order.id}`);
      }
    }
    ```
 
-5. **Instantiate the wrapper where the new behaviour is needed.**
+   In the test, inject a fake `IOrderProcessor` and your own recording `Logger`, then assert on the captured warnings:
 
    ```ts
-   const processor: IOrderProcessor = new TimingOrderProcessor(new OrderProcessor());
+   class RecordingLogger implements Logger {
+     readonly warnings: string[] = [];
+     warn(msg: string): void {
+       this.warnings.push(msg);
+     }
+   }
+   ```
+
+5. **Instantiate the wrapper where the new behaviour is needed.** Inject the production `ConsoleLogger` here.
+
+   ```ts
+   const processor: IOrderProcessor = new TimingOrderProcessor(new OrderProcessor(), new ConsoleLogger());
    processor.placeOrder(order);
    ```

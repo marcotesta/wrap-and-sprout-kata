@@ -3,8 +3,9 @@ package tech.qmates.kata.orders;
 import java.time.Instant;
 
 /**
- * A simple logger that is trivially instantiated with {@code new Logger()}.
- * The wrapper you build in this kata should use this to emit warnings.
+ * A simple logger, trivially instantiated with {@code new Logger()}.
+ * Inject it into the wrapper (pass {@code new Logger()} in production). To observe
+ * warnings in a test, subclass it or extract an interface for it.
  */
 public class Logger {
 

@@ -16,14 +16,14 @@ class TimingOrderProcessorTest {
     // TODO: Write a test that proves the wrapper logs a warning (via Logger.warn)
     //       when placeOrder takes longer than 2000ms, and logs nothing when it is fast.
     //       Drive a fake IOrderProcessor (the interface you extract from OrderProcessor)
-    //       and a capturing Logger so the timing/logging behaviour can be asserted
-    //       WITHOUT touching the real OrderRepository / EmailService / InventoryService.
+    //       and a Logger you can observe — a recording subclass, or a recording
+    //       implementation of an interface you extract for Logger — injected into the
+    //       wrapper, so the behaviour can be asserted WITHOUT real I/O or console capturing.
     //
     // @Test
     // void logs_a_warning_when_placeOrder_exceeds_the_threshold() {
-    //     // given a slow IOrderProcessor and a TimingOrderProcessor wrapping it...
+    //     // given a slow IOrderProcessor and a recording Logger, wrapped by a TimingOrderProcessor...
     //     // when placeOrder is called...
-    //     // then Logger.warn was invoked exactly once with a timing message.
-    //     assertTrue(false, "not implemented yet");
+    //     // then the recording Logger captured exactly one timing warning.
     // }
 }

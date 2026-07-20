@@ -51,7 +51,16 @@ export class InventoryService {
   }
 }
 
-export class Logger {
+// Emits log messages. ConsoleLogger (below) is the production implementation.
+// Inject a Logger into the wrapper: a ConsoleLogger in production wiring, and in
+// your tests a small recording Logger you implement, so warnings can be asserted
+// without spying on the console.
+export interface Logger {
+  warn(msg: string): void;
+}
+
+// Production Logger: writes warnings to the console.
+export class ConsoleLogger implements Logger {
   warn(msg: string): void {
     console.warn(`[WARN] ${msg}`);
   }
