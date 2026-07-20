@@ -42,7 +42,7 @@ Because of these dependencies, you should not try to test `processPayroll` as a 
 
 Before sending any payment, validate the employee's bank account number: it must be non-empty, contain numeric characters only, and be between 6 and 34 digits long. Skip employees with an invalid account (do not send their payment). The validation must live in a sprouted function or method that is tested in isolation.
 
-> **Why the signature stays the same.** Sprout Method deliberately leaves the host method untested; only the sprout is covered. Changing `processPayroll`'s return type would push a new, observable behavior into that untestable method — something you could neither verify with a test nor justify as a minimal edit to fragile legacy code. So keep `processPayroll` returning `void`: the sprout answers a question, and the host *consumes* that answer internally to decide whether to skip. (If you also want the skipped names surfaced, do it through the existing `console.log` summary line — still untested wiring, by design.)
+> **Why the signature stays the same.** Sprout Method deliberately leaves the host method untested; only the sprout is covered. Changing `processPayroll`'s return type would push a new, observable behavior into that untestable method — something you could neither verify with a test nor justify as a minimal edit to fragile legacy code. So keep `processPayroll` returning `void`: the sprout answers a question, and the host *consumes* that answer internally to decide whether to skip.
 
 ### Acceptance Criteria
 
@@ -55,8 +55,8 @@ Before sending any payment, validate the employee's bank account number: it must
 ### Hints
 
 - Start with the skeleton in `tests/payrollProcessor.test.ts`: replace the `it.todo` with real, failing tests for the sprout, then make them pass.
-- Test the sprout directly — it should take plain inputs and return data, with no `PaymentGateway` or `console.log` involved.
-- A regular expression such as `/^\d{6,34}$/` captures "numeric only, 6 to 34 digits" in one check.
+- Test the sprout directly — it should take plain inputs and return just the validation result.
+- Develop the validation logic in test-first.
 
 ## Steps to Apply the Technique
 
@@ -64,9 +64,8 @@ Before sending any payment, validate the employee's bank account number: it must
 
    ```ts
    for (const employee of employees) {
-     // <-- validation belongs here, before payment
-     const gateway = new PaymentGateway();
-     gateway.send(employee.accountNumber, netPay);
+     // <-- trigger validation here
+     // ...
    }
    ```
 
@@ -100,6 +99,7 @@ Before sending any payment, validate the employee's bank account number: it must
 
    ```ts
    if (!this.isValidAccountNumber(employee.accountNumber)) {
+    // optionally log the skipped accout
      continue; // skip payment for this employee
    }
    ```
