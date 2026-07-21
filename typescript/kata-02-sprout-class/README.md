@@ -43,15 +43,14 @@ en → <tr><th>Department</th><th>Manager</th><th>Profit</th><th>Expenses</th></
 it → <tr><th>Reparto</th><th>Responsabile</th><th>Profitto</th><th>Spese</th></tr>
 ```
 
-Rather than adding this logic inside the untestable `QuarterlyReportGenerator`, **sprout a new class** named `QuarterlyReportTableHeader`. It takes the language code as a constructor argument and exposes a single `generate(): string` method that returns the localised header row. Develop it test-first in `tests/quarterlyReportTableHeader.test.ts`, then call it from `QuarterlyReportGenerator.generate()` — passing the language read in the legacy constructor — so the header appears immediately after the opening `<table>` tag and before the first data row.
+Rather than adding this logic inside the untestable `QuarterlyReportGenerator`, **sprout a new, independently testable class** for the header row and develop it **test-first**, then wire it into the report. The *Steps* below walk through it.
 
 ### Acceptance Criteria
 
-- A new class `QuarterlyReportTableHeader` exists, taking a language code as a constructor argument and exposing a single `generate(): string` method.
-- `generate()` returns the header row with column titles localised to the given language: English and Italian are supported, and unknown / blank / `undefined` languages fall back to English.
-- The language-selection logic (including the fallback) is driven out **test-first (TDD)**, with tests covering each supported language and the fallback, and with no dependency on `DatabaseConnection` or the environment.
-- `QuarterlyReportGenerator.generate()` passes the language it read from the environment into the new class, so the localised header row sits between `<table>` and the first `<tr><td>...</td></tr>` data row.
-- `npm run typecheck` and `npm test` both pass; the legacy constructor is left untouched (no dependency injection or factory added).
+- A new sprouted class owns the localised header, developed **test-first** and tested in isolation (no database, no environment).
+- Column titles are localised — English and Italian supported; unknown / blank / `undefined` fall back to English.
+- The header row appears between `<table>` and the first data row.
+- The legacy generator is untouched apart from delegating to the new class; `npm run typecheck` and `npm test` pass.
 
 ### Hints
 
