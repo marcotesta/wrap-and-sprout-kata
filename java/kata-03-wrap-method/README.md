@@ -34,27 +34,18 @@ You are working on the HR system of a mid-sized company. `EmployeeService` handl
 
 ### Your Task
 
-Every **successful** promotion must now publish a `PromotionEvent` to the `EventBus`. `EventBus` is an interface with two implementations: `RealEventBus` (production — not wired up in this kata, so it throws) and, under `src/test`, `ObservableEventBus` (test-only — it records what was published). Apply **Wrap Method**:
+Every **successful** promotion must publish a `PromotionEvent` to the `EventBus`, describing what happened: which employee, the new title, and whether that title is a **leadership role** (a `newLeadership` flag — true when the title starts, case-insensitively, with `Head`, `Chief`, or `Manager`).
 
-1. Rename the existing `promote(String, String)` to a `private executePromotion(String, String)` (leave its body unchanged).
-2. Create a new public `promote(String, String)` with the identical signature that calls `executePromotion` and then publishes the event.
-3. Put the publishing in its own small method that takes an `EventBus` parameter, so you can develop it **test-first**. In the wrapper, inject a `new RealEventBus()`; in the tests, inject a `new ObservableEventBus()`.
+A promotion that fails its rules must publish **nothing**.
 
-**The behaviour to grow (test-first):** the published event carries a `newLeadership` flag. It is `true` when the new title names a **leadership role** — `newTitle` starts (case-insensitively) with `Head`, `Chief`, or `Manager` — and `false` otherwise. It is a deliberately simple rule; don't over-think the edge cases. This is the logic you drive out with tests, one branch at a time.
-
-**Added complexity (ordering):** if `executePromotion` throws a `PromotionException`, the event must **NOT** be published. Put the publish call *after* the wrapped call and let the exception propagate: a promotion that fails never reaches the publish line. This is a property of how you order the wrapper, not something you unit-test through the database.
-
-**How to test it (test-first):** do **not** call `promote` in your tests — that runs the legacy code and opens the production database. The new publishing method is self-contained: create an `ObservableEventBus`, pass it in, call the method directly, and assert on its `publishedEvents()`. Constructing `EmployeeService` is cheap (only `promote`/`executePromotion` touch the DB), so you can `new EmployeeService()` in a test and exercise the new method with no database, mocks, or subclassing.
+Add this *around* `promote` without changing its logic, using **Wrap Method**, and grow the new behaviour **test-first**.
 
 ### Acceptance Criteria
 
-- The public `promote(String, String)` keeps its exact original name, parameters, and `throws PromotionException` clause; no caller needs to change.
-- The original promotion logic is preserved verbatim inside a `private executePromotion(...)` method.
-- The new publishing behaviour lives in its own method (public or package-private) that takes an `EventBus` parameter; the wrapper injects a `RealEventBus`, and the tests inject an `ObservableEventBus`.
-- The new method is covered by tests written before its implementation (TDD), with **no database access** — the tests never call `promote` and never trigger `EmployeeRepository.getInstance()`.
-- An isolated test asserts the new method publishes exactly one `PromotionEvent`.
-- The wrapper publishes only *after* `executePromotion(...)` succeeds. So a failing promotion publishes nothing — guaranteed by construction, not by a test.
-- The published `PromotionEvent` carries a `newLeadership` flag derived from `newTitle` (true when it starts with `Head`, `Chief`, or `Manager`, case-insensitive), grown test-first with a test per branch.
+- `promote` keeps its exact signature; the original logic is preserved unchanged behind the wrapper.
+- The event-publishing is a separate, **test-first** unit, tested with no database access.
+- A successful promotion publishes exactly one `PromotionEvent`; a failing one publishes nothing.
+- The event carries a `newLeadership` flag (true for titles starting with `Head`/`Chief`/`Manager`, case-insensitive), grown test-first per branch.
 
 ### Hints
 
@@ -64,6 +55,8 @@ Every **successful** promotion must now publish a `PromotionEvent` to the `Event
 - The `newLeadership` rule is a case-insensitive prefix check against `Head`/`Chief`/`Manager`: write one test for a leadership title, one for a non-leadership title, and one proving the match ignores case.
 
 ## Steps to Apply the Technique
+
+The `EventBus` is an interface with two implementations: `RealEventBus` (production — not wired up here, so it throws) and, under `src/test`, `ObservableEventBus` (test-only — it records what was published). Inject the first in the wrapper, the second in your tests.
 
 1. **Identify the method you need to change.**
    ```java
