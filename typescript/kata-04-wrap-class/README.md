@@ -34,20 +34,17 @@ An e-commerce platform processes customer orders: it validates them, calculates 
 
 ### Your Task
 
-Every call to `placeOrder(order)` must be **timed**; if it takes longer than **2000ms**, log a warning through a `Logger`. The timing and logging logic must **not** be mixed into `OrderProcessor`. Apply the **Wrap Class** technique: build a `TimingOrderProcessor` that holds an `IOrderProcessor` and decorates `placeOrder`.
+Every call to `placeOrder(order)` must be **timed**. When it takes longer than **2000ms**, log a warning through the `Logger`; when it is fast, log nothing. This timing-and-logging concern must **not** be mixed into `OrderProcessor` — its existing logic stays untouched.
 
-`Logger` is an interface with a `ConsoleLogger` implementation for production. **Inject** a `Logger` into the wrapper — pass a `new ConsoleLogger()` in production wiring. For tests, write your own small `Logger` that records the warnings, so you can assert on them without spying on the console.
-
-Because `OrderProcessor` implements no interface, your **first** step is to **Extract an Interface** (`IOrderProcessor`) so that the original class and your wrapper share a contract: `class OrderProcessor implements IOrderProcessor` and `class TimingOrderProcessor implements IOrderProcessor`. Only the interface extraction may touch the original file; the behaviour of `OrderProcessor` stays the same.
+Add the behaviour *around* `OrderProcessor` with the **Wrap Class** technique (a decorator), and grow it **test-first**. The mechanics should be extract an interface for the _OrderProcessor_, develop a wrapper implementation of it growing the new behaviour **test-first**, keeping the warning logs observable in tests.
 
 ### Acceptance Criteria
 
-- An `IOrderProcessor` interface is extracted and implemented by `OrderProcessor` (its behaviour unchanged otherwise).
-- A `TimingOrderProcessor` implements `IOrderProcessor`, takes an `IOrderProcessor` **and a `Logger`** in its constructor, and delegates every method.
-- `placeOrder` is timed; a warning is logged via the injected `Logger` only when it exceeds 2000ms, and not when it is fast.
+- `OrderProcessor` is left unchanged (aside from the interface it now shares with the wrapper).
+- A decorator adds timing around `placeOrder`: it warns when the call exceeds 2000ms and stays silent when fast.
 - No timing or logging code lives inside `OrderProcessor`.
-- The behaviour is proven by tests written test-first, using a fake `IOrderProcessor` and a recording `Logger` you implement (no real I/O, no console spying).
-- `npm run typecheck` and `npm test` both pass.
+- The behaviour is driven **test-first** using test doubles for the processor and the logger — no real I/O, no console spying.
+- `npm run typecheck` and `npm test` pass.
 
 ### Hints
 
@@ -56,6 +53,8 @@ Because `OrderProcessor` implements no interface, your **first** step is to **Ex
 - Keep `TimingOrderProcessor` thin — it should only measure and (conditionally) warn; all real work stays behind `this.wrapped`.
 
 ## Steps to Apply the Technique
+
+The `Logger` is an interface with a `ConsoleLogger` implementation for production. Inject a `Logger` into the wrapper — a `ConsoleLogger` in production wiring, and in your tests a small recording `Logger` you implement, so warnings can be asserted without spying on the console.
 
 1. **Identify the behaviour to add.** Be precise about which method(s) the new concern wraps.
 
